@@ -1,1267 +1,777 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Financeiro com Análise de DRE por IA</title>
-    
-    <!-- Tailwind CSS para estilização -->
+    <title>Dashboard Executivo Avançado - Duralta</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js para gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Chart.js Datalabels Plugin -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <!-- PDF.js para ler ficheiros PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- Tesseract.js para OCR -->
-    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
-    
-    <!-- Google Fonts: Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
+        body { font-family: 'Inter', sans-serif; background-color: #030712; color: #e5e7eb; }
+        .card { background-color: #111827; border-radius: 0.75rem; border: 1px solid #1f2937; transition: transform 0.2s, box-shadow 0.2s; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -2px rgb(0 0 0 / 0.2); }
+        .btn-primary { background-color: #4f46e5; color: white; font-weight: 600; padding: 0.75rem 1.5rem; border-radius: 0.5rem; transition: background-color 0.3s, transform 0.2s; }
+        .btn-primary:hover { background-color: #6366f1; transform: scale(1.05); }
+        .loader-small { border: 2px solid #374151; border-top: 2px solid #6366f1; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; margin: auto;}
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .tab-btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s, color 0.2s; border: 2px solid transparent; }
+        .tab-btn.active { background-color: #4f46e5; color: white; }
+        .tab-btn:not(.active) { background-color: #1f2937; color: #9ca3af; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .chart-description { font-size: 0.875rem; color: #9ca3af; margin-top: -0.5rem; margin-bottom: 1rem; }
+        .heatmap-table { border-collapse: collapse; width: 100%; }
+        .heatmap-table th, .heatmap-table td { border: 1px solid #374151; padding: 8px; text-align: center; }
+        #cover-page {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
         }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1f2937; }
-        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type=number] { -moz-appearance: textfield; }
-        #loader {
-            border: 5px solid #374151;
-            border-radius: 50%;
-            border-top: 5px solid #3b82f6;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
+        #period-filter {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background-color: #111827;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid #1f2937;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
-        .small-loader {
-            border: 3px solid #374151;
-            border-top: 3px solid #3b82f6;
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .filter-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            margin-right: 0.5rem;
         }
-        .chart-container {
-            height: 400px;
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            font-weight: 500;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: 1px solid #374151;
+            color: #9ca3af;
         }
-        .prose h4 {
-            margin-top: 1.25em;
-            margin-bottom: 0.5em;
+        .filter-btn.active {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
         }
-        .prose pre {
-             background-color: #111827;
-             padding: 1rem;
-             border-radius: 0.5rem;
-             font-size: 0.875rem;
-             line-height: 1.25rem;
-             overflow-x: auto;
-             color: #d1d5db;
+        
+        /* --- ESTILOS DA ANÁLISE IA (ACCORDION) --- */
+        .insight-box {
+            background-color: #1f2937;
+            border-left: 4px solid #4f46e5;
+            padding: 0;
+            border-radius: 0.5rem;
+            margin-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            overflow: hidden;
         }
-        input:invalid {
-            border-color: #ef4444;
+        .insight-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 1rem;
+            background-color: transparent;
+            border: none;
+            color: #e5e7eb;
+            cursor: pointer;
+            text-align: left;
         }
-        /* Custom styles for month filter buttons */
-        .month-checkbox:checked + label {
-            background-color: #3b82f6;
-            border-color: #3b82f6;
-            color: #fff;
+        .insight-toggle:hover .text-indigo-400 {
+            text-decoration: underline;
+        }
+        .toggle-icon {
+            font-size: 1.2em;
+            transition: transform 0.3s ease;
+        }
+        .insight-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+            background-color: #111827;
+        }
+        .insight-content p {
+            padding: 0 1rem 1rem 1rem;
+            margin: 0;
+            line-height: 1.6;
+            color: #d1d5db;
+        }
+        .insight-content p:first-child {
+            padding-top: 0.5rem;
+        }
+        .insight-content.active {
+            max-height: 500px;
+            transition: max-height 0.4s ease-in;
         }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-200 antialiased">
 
-    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
-        
-        <header class="mb-8 text-center">
-            <h1 class="text-3xl md:text-4xl font-bold text-white">📊 Análise de DRE com Inteligência Artificial 🧠</h1>
-            <p class="text-gray-400 mt-2">Obtenha insights e projeções a partir do seu Demonstrativo de Resultados.</p>
+<body class="p-4 sm:p-6 lg:p-8">
+    <div id="cover-page">
+        <img src="https://i.postimg.cc/sD8r8jQ5/Design-sem-nome-5.png" alt="Logo Duralta" class="mb-6 rounded-full border-4 border-indigo-500 shadow-lg h-32 w-32">
+        <h1 class="text-5xl font-bold text-white mb-4">Relatório de Inteligência Estratégica Duralta</h1>
+        <p class="text-gray-400 mt-2 max-w-2xl mx-auto text-lg">Uma análise aprofundada do desempenho histórico (Períodos 2-4) para impulsionar o planejamento e as decisões críticas para o Período 5. Este dashboard integra dados operacionais, financeiros e de mercado para fornecer insights acionáveis.</p>
+        <button id="start-analysis-btn" class="btn-primary mt-8 text-lg px-8 py-4">Analisar Resultados</button>
+    </div>
+
+    <div id="dashboard-container" class="max-w-7xl mx-auto hidden">
+        <div id="period-filter" class="hidden">
+             <div class="filter-group" id="main-filter-group">
+                <span class="filter-label">Analisar:</span>
+                <button class="filter-btn" data-period="all" title="Mostra os dados de todos os períodos na linha do tempo. Os KPIs comparam P4 vs P3.">Todos</button>
+                <button class="filter-btn" data-period="0" title="Foca a análise nos dados do Período 2.">P2</button>
+                <button class="filter-btn" data-period="1" title="Foca a análise nos dados do Período 3.">P3</button>
+                <button class="filter-btn active" data-period="2" title="Foca a análise nos dados do Período 4.">P4</button>
+            </div>
+            <div class="filter-group" id="comparison-filter-group">
+                <span class="filter-label">Comparar com:</span>
+                <button class="filter-btn active" data-compare="previous" title="Compara o período selecionado com o seu período imediatamente anterior (ex: P4 vs P3).">Anterior</button>
+                <button class="filter-btn" data-compare="0" title="Define o Período 2 como a base de comparação para os KPIs.">P2</button>
+                <button class="filter-btn" data-compare="1" title="Define o Período 3 como a base de comparação para os KPIs.">P3</button>
+            </div>
+        </div>
+
+        <header class="text-center mb-10">
+            <img src="https://i.postimg.cc/sD8r8jQ5/Design-sem-nome-5.png" alt="Logo Duralta" class="mx-auto mb-4 rounded-full border-2 border-indigo-500 h-24 w-24">
+            <h1 class="text-4xl font-bold text-white">Dashboard Executivo Avançado - Duralta</h1>
+            <p class="text-gray-400 mt-2">Análise Integrada de Desempenho (P2-P4) e Planejamento para o Período 5.</p>
         </header>
-        
-        <section id="pricing-analysis-section" class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 mb-8">
-            <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-4">⚙️ Parâmetros de Análise</h2>
-            
-            <div id="pricing-inputs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                <div>
-                    <label for="purchase-price" class="text-sm font-medium text-gray-400">Preço Compra Matéria-Prima (R$/KG)</label>
-                    <input type="number" id="purchase-price" step="0.01" class="mt-1 w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" value="14.50" required>
-                </div>
+
+        <div class="flex flex-wrap justify-center gap-2 mb-8" id="tabs">
+            <button class="tab-btn active" data-tab="geral">Resumo Executivo</button>
+            <button class="tab-btn" data-tab="comercial">Análise Comercial</button>
+            <button class="tab-btn" data-tab="operacional">Análise Operacional</button>
+            <button class="tab-btn" data-tab="financeiro">Análise Financeira</button>
+            <button class="tab-btn" data-tab="rh_macro">RH & Macroeconomia</button>
+        </div>
+
+        <div id="tab-contents">
+            <!-- ABA: RESUMO EXECUTIVO -->
+            <div id="geral" class="tab-content active">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10" id="kpi-cards"></div>
                 
-                <div class="flex flex-col">
-                    <label for="variable-cost" class="text-sm font-medium text-gray-400">Outros Custos Variáveis</label>
-                    <div class="flex items-center mt-1">
-                        <input type="number" id="variable-cost" step="0.01" class="w-full bg-gray-700 border border-gray-600 text-white rounded-l-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" value="0.00" required>
-                        <select id="variable-cost-mode" class="bg-gray-600 border-l-0 border border-gray-600 text-white rounded-r-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            <option value="perkg">R$/kg</option>
-                            <option value="total">Total R$</option>
-                        </select>
+                <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">Evolução dos Indicadores Chave</h2>
+                    <p class="chart-description">Visão geral do desempenho financeiro e de mercado da Duralta.</p>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div><h3 class="font-semibold text-center text-gray-400 mb-2">📈 Lucro Líquido vs. Valor da Ação</h3><canvas id="lucroAcaoChart"></canvas></div>
+                        <div><h3 class="font-semibold text-center text-gray-400 mb-2">🏆 Market Share vs. Preço Médio</h3><canvas id="marketSharePrecoChart"></canvas></div>
                     </div>
                 </div>
 
-                <div class="flex flex-col">
-                    <label class="text-sm font-medium text-gray-400">Fonte dos Custos Fixos</label>
-                    <div class="flex items-center mt-1">
-                        <select id="fixed-cost-mode" class="w-full bg-gray-600 border border-gray-600 text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            <option value="dre">Usar DRE</option>
-                            <option value="manual">Informar Manualmente</option>
-                        </select>
-                        <input type="number" id="fixed-cost-manual" step="0.01" class="hidden ml-2 w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Valor Fixo Mensal (R$)">
-                    </div>
-                </div>
-            </div>
-            
-            <div class="flex flex-wrap justify-between items-center mb-4 border-b border-gray-700 pb-4 gap-4">
-                <h3 class="text-xl font-semibold text-white">📦 Mix de Produtos de Venda</h3>
-                <div class="flex flex-wrap gap-2 items-center">
-                    <button id="format-prices-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">Formatar Preços</button>
-                    <button id="normalize-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">Normalizar %</button>
-                    <button id="add-material-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">Adicionar</button>
-                </div>
-            </div>
-            <div id="mix-warning" class="hidden my-2 p-2 text-center text-yellow-300 bg-yellow-900/50 rounded-lg"></div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead class="text-sm text-gray-300 uppercase">
-                        <tr>
-                            <th class="p-2">Tipo de Material</th>
-                            <th class="p-2">Porcentagem (%)</th>
-                            <th class="p-2">Preço de Venda (R$/KG)</th>
-                            <th class="p-2 text-center">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="materials-body"></tbody>
-                </table>
-            </div>
-        </section>
-
-        <section id="upload-section" class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 mb-8 max-w-3xl mx-auto">
-            <h2 class="text-xl font-semibold mb-4 text-white">🚀 Upload e Análise Final</h2>
-            <div class="space-y-4">
-                 <div>
-                      <label for="gemini-api-key" class="block text-sm font-medium text-gray-400 mb-1 text-left">Chave da API do Gemini</label>
-                      <input type="password" id="gemini-api-key" placeholder="Insira a sua chave da API aqui" class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" value="AIzaSyAbHxgCDpTSGvtfn3H3zNqALhsGU9ggawA" required>
-                 </div>
-                 <div>
-                      <label for="pdf-upload" class="block text-sm font-medium text-gray-400 mb-1 text-left">Ficheiro DRE (PDF)</label>
-                      <input type="file" id="pdf-upload" accept="application/pdf" class="block w-full text-sm text-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-600 file:text-gray-200 hover:file:bg-gray-500" required>
-                 </div>
-                 <div id="month-filter-section" class="hidden">
-                    <label class="text-sm font-medium text-gray-400">Selecione os Meses para Análise</label>
-                    <div id="month-filter-container" class="mt-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                        <!-- Month filter buttons will be dynamically inserted here -->
-                    </div>
-                </div>
-            </div>
-            <button id="analyze-button" class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2" disabled>
-                <span>Analisar com IA</span>
-            </button>
-            <div id="loader-container" class="mt-6 hidden flex-col items-center">
-                <div id="loader"></div>
-                <p id="loader-text" class="text-blue-400 mt-2">Processando PDF...</p>
-            </div>
-             <div id="error-message" class="mt-4 text-red-400 bg-red-900/50 p-3 rounded-lg hidden"></div>
-        </section>
-
-        <!-- Container para os resultados da análise -->
-        <main id="analysis-results" class="space-y-12 mt-12 hidden">
-            
-            <section id="summary-panel" class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hidden">
-                <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-4">📈 Resumo dos Dados Extraídos (Período Selecionado)</h2>
-                <div id="summary-content" class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-                </div>
-            </section>
-            
-            <section id="monthly-summary-panel" class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hidden">
-                <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-4">🗓️ Resumo Mensal dos Dados Extraídos</h2>
-                <div id="monthly-summary-content" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                </div>
-            </section>
-
-            <section class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-                <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-4">💡 Sumário Executivo e Análise de Variações (IA)</h2>
-                <div id="general-analysis-content" class="prose prose-invert max-w-none"></div>
-            </section>
-            
-            <section id="pricing-results-section" class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hidden">
-                <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-4">🎯 Análise de Simulação: Realizado (DRE) vs. Simulado (Mix)</h2>
-                <div id="simulator-analysis-content" class="prose prose-invert max-w-none mb-8"></div>
-                <div class="grid lg:grid-cols-2 gap-8 mb-8">
-                    <div class="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                        <h3 class="text-lg font-bold mb-4 text-center text-white">Receita: Realizada vs. Simulada</h3>
-                        <div class="chart-container h-72"><canvas id="revenueSimulatorChart"></canvas></div>
-                        <p class="text-xs text-gray-400 mt-2 text-center">Compara a receita do DRE com a receita projetada pelo seu mix de produtos, incluindo o Ponto de Equilíbrio (PE) como meta.</p>
-                    </div>
-                    <div class="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                        <h3 class="text-lg font-bold mb-4 text-center text-white">Margem de Contribuição: Realizada vs. Simulada</h3>
-                        <div class="chart-container h-72"><canvas id="marginSimulatorChart"></canvas></div>
-                         <p class="text-xs text-gray-400 mt-2 text-center">Compara a Margem de Contribuição (MC) do DRE com a MC projetada pelo seu mix. <br>Fórmula: MC = Receita - Custos Variáveis.</p>
-                    </div>
-                </div>
-                <div class="overflow-x-auto bg-gray-900/50 rounded-xl border border-gray-700">
-                    <table class="w-full text-left">
-                        <thead class="bg-gray-700 text-sm text-gray-300 uppercase">
-                            <tr>
-                                <th class="p-4">Mês</th>
-                                <th class="p-4 text-right">Receita Real (DRE)</th>
-                                <th class="p-4 text-right">Receita Simulada (Mix)</th>
-                                <th class="p-4 text-right">Diferença</th>
-                                <th class="p-4 text-right">PE (R$)</th>
-                                <th class="p-4 text-right">PE (KG)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="results-body" class="divide-y divide-gray-700"></tbody>
-                    </table>
-                </div>
-            </section>
-            
-            <section id="breakeven-projection-section" class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 hidden">
-                <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-4">📍 Análise e Projeção do Ponto de Equilíbrio (Base DRE)</h2>
-                <div class="grid lg:grid-cols-2 gap-8">
-                    <div>
-                        <div class="chart-container"><canvas id="breakEvenProjectionChart"></canvas></div>
-                        <p class="text-xs text-gray-400 mt-2 text-center">Compara a receita real com o Ponto de Equilíbrio (PE) calculado com dados do DRE e projeta uma meta de PE para os próximos 6 meses com base na média do período analisado.</p>
-                    </div>
-                    <div class="overflow-x-auto bg-gray-900/50 rounded-xl border border-gray-700">
-                        <table class="w-full text-left">
-                            <thead class="bg-gray-700 text-sm text-gray-300 uppercase">
-                                <tr>
-                                    <th class="p-3">Mês</th>
-                                    <th class="p-3 text-right">MC (DRE)</th>
-                                    <th class="p-3 text-right">MC % (DRE)</th>
-                                    <th class="p-3 text-right">PE (R$) (DRE)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="breakEvenProjectionTable" class="divide-y divide-gray-700"></tbody>
-                        </table>
-                         <p class="text-xs text-gray-400 mt-2 text-center p-2">Esta tabela mostra os componentes usados para calcular o Ponto de Equilíbrio (PE) de cada mês, usando apenas os dados extraídos do DRE.</p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="grid lg:grid-cols-2 gap-8">
-                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-                    <h3 class="text-xl font-bold mb-4 text-center text-white">Margem Operacional vs. Margem Líquida</h3>
-                    <div class="chart-container"><canvas id="operationalNetMarginChart"></canvas></div>
-                    <p class="text-xs text-gray-400 mt-2 text-center">Compara a rentabilidade da operação (Margem Operacional) com a rentabilidade final (Margem Líquida).<br>Fórmula: Margem = (Resultado / Receita Líquida) * 100.</p>
-                </div>
-                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-                    <h3 class="text-xl font-bold mb-4 text-center text-white">Qualidade do Resultado</h3>
-                    <div class="chart-container"><canvas id="resultQualityChart"></canvas></div>
-                    <p class="text-xs text-gray-400 mt-2 text-center">Mostra a composição do resultado, separando o que veio da atividade principal (Operacional) e de eventos não recorrentes (Não Operacional).</p>
-                </div>
-                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-                    <h3 class="text-xl font-bold mb-4 text-center text-white">Análise Vertical (% da Receita Líquida)</h3>
-                    <div class="chart-container"><canvas id="verticalAnalysisChart"></canvas></div>
-                    <p class="text-xs text-gray-400 mt-2 text-center">Demonstra o peso percentual dos custos e do lucro em relação à Receita Líquida, ajudando a entender a estrutura de custos.</p>
-                </div>
-                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-                    <h3 class="text-xl font-bold mb-4 text-center text-white">Análise Horizontal (Variação Mensal %)</h3>
-                    <div class="chart-container"><canvas id="horizontalAnalysisChart"></canvas></div>
-                    <p class="text-xs text-gray-400 mt-2 text-center">Exibe a variação percentual da receita e do lucro de um mês para o outro, destacando tendências de crescimento ou queda.</p>
-                </div>
-            </section>
-
-            <section class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-                 <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-4">⚠️ Recomendações e Inconsistências (IA)</h2>
-                <div class="grid md:grid-cols-2 gap-8 items-start">
-                    <div id="critical-points-content" class="bg-gray-900/50 p-6 rounded-xl border border-red-500/30 prose prose-invert max-w-none"></div>
-                    <div class="bg-gray-800 p-6 rounded-2xl grid grid-rows-2 gap-8">
+                <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">Pareto de Resultados e Análise Competitiva</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div>
-                            <h3 class="text-xl font-bold mb-4 text-center">Composição Média dos Custos Variáveis</h3>
-                            <div class="chart-container h-48"><canvas id="costsCompositionChart"></canvas></div>
-                             <p class="text-xs text-gray-400 mt-2 text-center">Divide o total dos custos que variam com a produção, mostrando o peso da Matéria-Prima em relação aos outros custos.</p>
+                            <h3 class="font-semibold text-center text-gray-400 mb-2">Análise de Pareto do Lucro Líquido Acumulado</h3>
+                            <canvas id="paretoLucroChart"></canvas>
+                            <div class="insight-box" id="insight-paretoLucro"></div>
                         </div>
                         <div>
-                            <h3 class="text-xl font-bold mb-4 text-center">Composição Média dos Custos Fixos</h3>
-                            <div class="chart-container h-48"><canvas id="fixedCostsCompositionChart"></canvas></div>
-                             <p class="text-xs text-gray-400 mt-2 text-center">Mostra como os custos fixos totais são distribuídos entre Pessoal, Ocupação e Serviços de Terceiros.</p>
+                            <h3 class="font-semibold text-center text-gray-400 mb-2">⚔️ Radar de Desempenho Competitivo (P4)</h3>
+                            <canvas id="radarChart"></canvas>
+                             <div class="overflow-x-auto mt-4">
+                                <table class="w-full text-sm text-left text-gray-300">
+                                    <thead class="text-xs text-gray-400 uppercase bg-gray-700">
+                                        <tr>
+                                            <th class="px-4 py-3">Empresa</th>
+                                            <th class="px-4 py-3 text-right">Valor Ação</th>
+                                            <th class="px-4 py-3 text-right">Market Share</th>
+                                            <th class="px-4 py-3 text-right">Margem Lucro</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="competitor-table"></tbody>
+                                </table>
+                            </div>
+                            <div class="insight-box" id="insight-radar"></div>
                         </div>
                     </div>
                 </div>
-            </section>
-            
-            <section class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-                <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-4">📋 Dados Extraídos (IA)</h2>
-                <p class="text-gray-400 mb-4">Esta seção mostra os dados brutos extraídos pela IA do seu DRE em formato de tabela (CSV). Estes são os números que alimentam todos os gráficos e análises do dashboard.</p>
-                <div id="csv-data-content" class="space-y-6 prose prose-invert max-w-none"></div>
-            </section>
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">🔥 Heatmap de Vendas por Região e Período (Unidades)</h2>
+                    <p class="chart-description">Este mapa de calor mostra a concentração de nossas vendas. Células mais brilhantes (verdes) indicam alto volume, enquanto as mais escuras indicam baixo desempenho.</p>
+                    <div id="heatmapVendas" class="overflow-x-auto"></div>
+                    <div class="insight-box" id="insight-heatmapVendas"></div>
+                </div>
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">🏆 Heatmap de Market Share por Região e Período (%)</h2>
+                    <p class="chart-description">Similar ao de vendas, este mapa de calor foca na nossa participação de mercado. Ele é crucial para entender se estamos crescendo em vendas por mérito próprio ou apenas seguindo o crescimento do mercado.</p>
+                    <div id="heatmapMarketShare" class="overflow-x-auto"></div>
+                    <div class="insight-box" id="insight-heatmapMarketShare"></div>
+                </div>
+            </div>
 
-        </main>
+            <!-- ABA: ANÁLISE COMERCIAL -->
+            <div id="comercial" class="tab-content">
+                <div class="card p-6 mb-8">
+                     <h2 class="text-2xl font-semibold mb-2 text-white">🗺️ Desempenho de Vendas por Região (P4)</h2>
+                    <p class="chart-description">Análise comparativa das unidades vendidas em cada região, essencial para identificar fortalezas, fraquezas e oportunidades geográficas.</p>
+                    <canvas id="regionalSalesChart"></canvas>
+                    <div class="insight-box mt-6" id="insight-regionalSales"></div>
+                </div>
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">🎯 Elasticidade Preço-Venda (P4)</h2>
+                    <p class="chart-description">Este gráfico analisa a relação entre o preço praticado e o volume de vendas alcançado em cada região, ajudando a entender a sensibilidade da demanda.</p>
+                    <canvas id="precoVendasChart"></canvas>
+                    <div class="insight-box" id="insight-precoVendas"></div>
+                </div>
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">📍 Análise Estratégica: Composição da Receita</h2>
+                    <p class="chart-description">Este gráfico demonstra a contribuição de cada região para a receita total da empresa, mostrando a evolução da nossa dependência de cada mercado.</p>
+                    <canvas id="receitaRegiaoChart"></canvas>
+                    <div class="insight-box" id="insight-receitaRegiao"></div>
+                </div>
+                <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">📊 Comparativo de Demanda e Vendas</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                          <div>
+                            <h3 class="font-semibold text-center text-gray-400 mb-2">Market Share por Empresa (P4)</h3>
+                            <canvas id="marketSharePieChart"></canvas>
+                        </div>
+                        <div>
+                           <h3 class="font-semibold text-center text-gray-400 mb-2">Demanda vs. Vendas Duralta</h3>
+                           <canvas id="demandaNaoAtendidaChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="insight-box" id="insight-demanda"></div>
+                </div>
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">Evolução do Market Share (Total)</h2>
+                    <p class="chart-description">Acompanhamento da nossa participação de mercado em comparação com os principais concorrentes ao longo do tempo.</p>
+                    <canvas id="marketShareTimelineChart"></canvas>
+                </div>
+                 <div class="card p-6 mb-8">
+                      <h2 class="text-2xl font-semibold mb-2 text-white">📢 Marketing e Força da Marca</h2>
+                      <p class="chart-description">Análise do investimento em propaganda e seu retorno na percepção da marca ao longo do tempo.</p>
+                      <canvas id="marcaPropagandaChart"></canvas>
+                      <div class="insight-box" id="insight-marcaPropaganda"></div>
+                 </div>
+            </div>
+
+            <!-- ABA: ANÁLISE OPERACIONAL -->
+            <div id="operacional" class="tab-content">
+                <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">🏭 Produção e Estoque</h2>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                         <div>
+                            <h3 class="font-semibold text-center text-gray-400 mb-2">Produção Real vs. Capacidade Máxima</h3>
+                            <canvas id="productionCapacityChart"></canvas>
+                            <div class="insight-box" id="insight-productionCapacity"></div>
+                        </div>
+                        <div>
+                           <h3 class="font-semibold text-center text-gray-400 mb-2">Origem da Matéria-Prima (Visão Agregada)</h3>
+                           <canvas id="materiaPrimaAreaChart"></canvas>
+                            <div class="insight-box" id="insight-materiaPrima"></div>
+                        </div>
+                    </div>
+                </div>
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">🔧 Parque Fabril e Custos de Manutenção</h2>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                         <div>
+                            <h3 class="font-semibold text-center text-gray-400 mb-2">Evolução das Máquinas e Idade Média</h3>
+                            <canvas id="maquinasChart"></canvas>
+                        </div>
+                        <div>
+                           <h3 class="font-semibold text-center text-gray-400 mb-2">Custo de Manutenção Estimado</h3>
+                           <canvas id="manutencaoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">📉 Análise Estratégica: Custos Não Planejados</h2>
+                    <p class="chart-description">Este gráfico compara os custos de manutenção com os custos extras gerados por compras emergenciais de matéria-prima.</p>
+                    <canvas id="custosEmergenciaisChart"></canvas>
+                    <div class="insight-box" id="insight-custosEmergenciais"></div>
+                </div>
+            </div>
+            
+            <!-- ABA: ANÁLISE FINANCEIRA -->
+            <div id="financeiro" class="tab-content">
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">🚀 Análise Estratégica: Alavancagem e Rentabilidade</h2>
+                    <p class="chart-description">Correlação entre as decisões de alavancagem financeira (endividamento), precificação e o impacto no lucro operacional.</p>
+                    <canvas id="lucroAlavancagemChart"></canvas>
+                    <div class="insight-box" id="insight-lucroAlavancagem"></div>
+                </div>
+                <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">💰 Radar de Saúde Financeira (P4)</h2>
+                    <p class="chart-description">Comparativo de indicadores financeiros chave entre a Duralta e concorrentes. Valores maiores são melhores, exceto para Alavancagem (que foi invertida para a visualização).</p>
+                    <canvas id="financeRadarChart"></canvas>
+                    <div class="insight-box" id="insight-financeRadar"></div>
+                </div>
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">📊 Demonstrativo de Resultados (Evolução)</h2>
+                    <p class="chart-description">Análise da performance financeira da Duralta, desde a receita bruta até o lucro líquido.</p>
+                    <canvas id="incomeStatementChart"></canvas>
+                </div>
+                <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">🌊 Fluxo de Caixa e Balanço Patrimonial (P4)</h2>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                         <div>
+                            <h3 class="font-semibold text-center text-gray-400 mb-2">Fluxo de Caixa por Atividades (P4)</h3>
+                            <canvas id="cashflowWaterfallP4Chart"></canvas>
+                        </div>
+                        <div>
+                           <h3 class="font-semibold text-center text-gray-400 mb-2">Composição do Ativo (P4)</h3>
+                           <canvas id="assetCompositionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA: RH & MACROECONOMIA -->
+            <div id="rh_macro" class="tab-content">
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">👥 Análise de Recursos Humanos</h2>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                         <div>
+                            <h3 class="font-semibold text-center text-gray-400 mb-2">Evolução da Força de Trabalho e Produtividade</h3>
+                            <canvas id="rhChart"></canvas>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-center text-gray-400 mb-2">Impacto do Treinamento na Produtividade</h3>
+                            <canvas id="rhInvestmentScatterChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">⚖️ Análise Estratégica: Fatores de Motivação</h2>
+                    <p class="chart-description">Análise da relação entre a motivação dos funcionários, a carga de trabalho (horas extras) e o salário base oferecido.</p>
+                    <canvas id="motivacaoFatoresChart"></canvas>
+                    <div class="insight-box" id="insight-motivacaoFatores"></div>
+                </div>
+                 <div class="card p-6 mb-8">
+                    <h2 class="text-2xl font-semibold mb-2 text-white">Motivação vs. PLR e Cenário Macroeconômico</h2>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                         <div>
+                            <h3 class="font-semibold text-center text-gray-400 mb-2">Motivação vs. Investimento em PLR</h3>
+                            <canvas id="motivationPlrChart"></canvas>
+                        </div>
+                        <div>
+                           <h3 class="font-semibold text-center text-gray-400 mb-2">🌍 Indicadores Macroeconômicos</h3>
+                           <canvas id="macroChart"></canvas>
+                        </div>
+                    </div>
+                        <div class="insight-box" id="insight-motivacaoPlr"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Register Chart.js plugins
-            Chart.register(ChartDataLabels);
+            // --- DATA HUB ---
+            const simulationData = {
+                periodos: ["Período 2", "Período 3", "Período 4"],
+                regioes: ["Região 1", "Região 2", "Região 3", "Região 4", "Região 5", "Região 6"],
+                duralta: {
+                    decisoes: {
+                        p2: { precoMedio: 463, propaganda: 17, juros: 3.0, nivelAtividade: 100, prodExtra: 3, compraMPA: 35000, compraMPB: 22000, compraMaq: "Nenhuma", emprestimo: 0, aplicacao: 0, admissoes: 0, demissoes: 0, salario: 3100, treinamento: 4, plr: 0 },
+                        p3: { precoMedio: 471, propaganda: 10, juros: 1.5, nivelAtividade: 100, prodExtra: 0, compraMPA: 26000, compraMPB: 21000, compraMaq: "Nenhuma", emprestimo: 0, aplicacao: 0, admissoes: 0, demissoes: 10, salario: 3100, treinamento: 3, plr: 2 },
+                        p4: { precoMedio: 517, propaganda: 6, juros: 3.5, nivelAtividade: 100, prodExtra: 25, compraMPA: 63781, compraMPB: 43566, compraMaq: "1 Alfa", emprestimo: 1000000, aplicacao: 20000, admissoes: 20, demissoes: 0, salario: 3150, treinamento: 5, plr: 3 }
+                    },
+                    demanda: [14992, 15085, 7413],
+                    lucroLiquido: [245589, 391782, 955247], lucroBruto: [1556658, 1602393, 2397236], lucroOperacional: [332928, 514326, 1202577],
+                    valorAcao: [67.25, 76.89, 75.04], marketShare: [25.94, 29.22, 28.34],
+                    vendas: [10506, 10300, 13125], producao: [10506, 10300, 13125], capacidade: [12881, 12875, 15750], 
+                    produtividade: [1.02, 1.03, 1.05],
+                    endividamentoTotal: [2000000, 2000000, 3300000], caixaFinal: [585341, 62254, 1178478],
+                    fluxoCaixaP4: { inicial: 62254, operacional: 478170, investimento: -520000, financiamento: 1158055, final: 1178478 },
+                    balancoP4: { caixa: 1178478, aplicacao: 20000, clientes: 4220466, estoque: 3134443, imobilizado: 3926400, passivo: 5831771, patrimonioLiquido: 7448015},
+                    cpv: { p2: 3411544, p3: 3293605, p4: 4504422, composicaoP4: { maoDeObra: 2532600, materiaPrima: 1847427, outros: 124395 } },
+                    rh: { empregados: [470, 460, 480], salario: [3100, 3100, 3150], treinamento: [4, 3, 5], motivacao: [3, 3, 3], prodExtra: [3, 0, 25] },
+                    maquinas: { alfa: [5, 5, 6], idadeMedia: [15, 16, 14.17], custoManutencao: [154500, 160000, 212500] },
+                    marketing: { propaganda: [17, 10, 6], forcaMarca: [1, 1, 2] },
+                    operacional: { mp_a_emergencial: [1518, 0, 9275], mp_a_programada: [30000, 30900, 30100] },
+                    vendasRegionais: { p2: [923, 2154, 1402, 1323, 1649, 3055], p3: [1190, 2399, 1290, 1272, 1668, 2481], p4: [3745, 2497, 2019, 2000, 1427, 1437] },
+                    precosRegionais: {p2: [457, 463, 469, 455, 469, 463], p3: [475, 455, 479, 466, 475, 477], p4: [520, 520, 520, 500, 520, 520]},
+                },
+                competitors: {
+                    'Luminous SA': { marketShare: [23.70, 28.79, 22.46], vendas: [9600, 10148, 10405], caixaFinal: [557816, 916741, 1849408] },
+                    'Sweet Tooth': { marketShare: [25.18, 27.52, 26.95] },
+                    'Empresa 5': { marketShare: [25.18, 14.47, 22.24] }
+                },
+                competitorsP4: {
+                    'Duralta': { valorAcao: 75.04, marketShare: 28.34, margemLucro: 13.84, precoMedio: 517, roe: 12.8, liquidez: 1.55, alavancagem: 0.44 },
+                    'Luminous SA': { valorAcao: 79.80, marketShare: 22.46, margemLucro: 16.3, precoMedio: 503, vendasRegionais: [2274, 1994, 1134, 1082, 2663, 1253], precosRegionais: [505, 510, 490, 495, 510, 505], roe: 13.2, liquidez: 1.93, alavancagem: 0.35 },
+                    'Sweet Tooth': { valorAcao: 79.80, marketShare: 26.95, margemLucro: 16.32, precoMedio: 510, roe: 13.18, liquidez: 1.93, alavancagem: 0.54 },
+                    'Empresa 5': { valorAcao: 54.22, marketShare: 22.24, margemLucro: 8.9, precoMedio: 466, vendasRegionais: [1359, 1314, 1626, 1365, 2555, 2079], precosRegionais: [465, 465, 465, 465, 470, 465], roe: 0, liquidez: 1.56, alavancagem: 2 }
+                },
+                mercado: { macro: { selic: [1.2, 1.2, 1.2], inflacao: [1.0, 1.0, 1.0], inadimplencia: [3.2, 3.2, 3.1] } }
+            };
+            
+            const GEMINI_API_KEY = "";
+            let chartInstances = {};
+            let selectedPeriod = '2'; 
+            let comparisonPeriod = 'previous';
 
-            const { pdfjsLib } = globalThis;
-            if (pdfjsLib) {
-               pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+            // --- DADOS CALCULADOS ADICIONAIS ---
+            simulationData.duralta.receitaPorRegiao = {
+                p2: simulationData.duralta.vendasRegionais.p2.map((v, i) => v * simulationData.duralta.precosRegionais.p2[i]),
+                p3: simulationData.duralta.vendasRegionais.p3.map((v, i) => v * simulationData.duralta.precosRegionais.p3[i]),
+                p4: simulationData.duralta.vendasRegionais.p4.map((v, i) => v * simulationData.duralta.precosRegionais.p4[i])
+            };
+            simulationData.duralta.custoCompraEmergencial = [
+                simulationData.duralta.operacional.mp_a_emergencial[0] * 20 * 1.5,
+                simulationData.duralta.operacional.mp_a_emergencial[1] * 20 * 1.5,
+                simulationData.duralta.operacional.mp_a_emergencial[2] * 20 * 1.5
+            ];
+
+            // --- LÓGICA DE INICIALIZAÇÃO E EVENTOS ---
+            function initializeDashboard() {
+                document.getElementById('tabs').addEventListener('click', handleTabClick);
+                document.getElementById('start-analysis-btn').addEventListener('click', showDashboard);
+                document.getElementById('period-filter').addEventListener('click', handleFilterClick);
+                document.getElementById('dashboard-container').addEventListener('click', handleAccordionToggle);
+            }
+
+            function handleTabClick(e) {
+                if (e.target.tagName === 'BUTTON') {
+                    const targetTab = e.target.dataset.tab;
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    document.getElementById(targetTab).classList.add('active');
+                }
+            }
+
+            function showDashboard() {
+                document.getElementById('cover-page').classList.add('hidden');
+                document.getElementById('dashboard-container').classList.remove('hidden');
+                document.getElementById('period-filter').classList.remove('hidden');
+                renderFullDashboard();
+            }
+
+            function handleFilterClick(e) {
+                const button = e.target.closest('.filter-btn');
+                if (!button) return;
+
+                if (button.dataset.period) {
+                    selectedPeriod = button.dataset.period;
+                    document.querySelectorAll('#main-filter-group .filter-btn').forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    updateCharts(selectedPeriod);
+                } else if (button.dataset.compare) {
+                    comparisonPeriod = button.dataset.compare;
+                    document.querySelectorAll('#comparison-filter-group .filter-btn').forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                }
+                updateKPIs();
+            }
+
+            function handleAccordionToggle(e) {
+                const toggle = e.target.closest('.insight-toggle');
+                if (toggle) {
+                    const content = toggle.nextElementSibling;
+                    const icon = toggle.querySelector('.toggle-icon');
+                    if (content && content.classList.contains('insight-content')) {
+                        content.classList.toggle('active');
+                        icon.style.transform = content.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+                    }
+                }
             }
             
-            const apiKeyInput = document.getElementById('gemini-api-key');
-            const fileInput = document.getElementById('pdf-upload');
-            const analyzeButton = document.getElementById('analyze-button');
-            const loader = document.getElementById('loader-container');
-            const loaderText = document.getElementById('loader-text');
-            const resultsContainer = document.getElementById('analysis-results');
-            const errorMessageDiv = document.getElementById('error-message');
-            let chartInstances = {};
+            function updateKPIs() {
+                const kpiContainer = document.getElementById('kpi-cards');
+                kpiContainer.innerHTML = '';
+                
+                let currentIdx = selectedPeriod === 'all' ? 2 : parseInt(selectedPeriod, 10);
+                let previousIdx;
+
+                if (comparisonPeriod === 'previous') {
+                    previousIdx = Math.max(0, currentIdx - 1);
+                } else {
+                    previousIdx = parseInt(comparisonPeriod, 10);
+                }
+                
+                const comparisonLabel = `P${previousIdx + 2}`;
+                
+                const kpiData = [
+                     { title: `💰 Lucro Líquido (P${currentIdx + 2})`, value: simulationData.duralta.lucroLiquido[currentIdx], prevValue: simulationData.duralta.lucroLiquido[previousIdx], format: 'currency' },
+                    { title: `📈 Valor da Ação (P${currentIdx + 2})`, value: simulationData.duralta.valorAcao[currentIdx], prevValue: simulationData.duralta.valorAcao[previousIdx], format: 'currency' },
+                    { title: `🏆 Market Share (P${currentIdx + 2})`, value: simulationData.duralta.marketShare[currentIdx], prevValue: simulationData.duralta.marketShare[previousIdx], format: 'percent' },
+                    { title: `😕 Motivação (P${currentIdx + 2})`, value: "Regular", prevValue: "Regular", format: 'text' }
+                ];
+
+                kpiData.forEach(kpi => {
+                    let change = 0;
+                    if (kpi.format !== 'text' && currentIdx !== previousIdx && kpi.prevValue !== 0) {
+                        change = ((kpi.value - kpi.prevValue) / Math.abs(kpi.prevValue)) * 100;
+                    }
+                    const isNegative = change < 0;
+                    const trendIcon = isNegative ? '⬇️' : '⬆️', trendColor = isNegative ? 'text-red-400' : 'text-green-400';
+                    const formattedValue = kpi.format === 'currency' ? `$${kpi.value.toLocaleString('pt-BR')}` : kpi.format === 'percent' ? `${kpi.value.toFixed(2)}%` : kpi.value;
+                    let changeText;
+                     if (kpi.format === 'text') {
+                        changeText = `<span class="text-yellow-400 text-sm font-semibold">⚠️ Ponto de Atenção</span>`;
+                    } else if (currentIdx === previousIdx) {
+                        changeText = `<span class="text-gray-400 text-sm font-semibold">Base de comparação</span>`;
+                    } else {
+                        changeText = `<span class="${trendColor} text-sm font-semibold">${trendIcon} ${change.toFixed(2)}% vs ${comparisonLabel}</span>`;
+                    }
+
+                    kpiContainer.innerHTML += `<div class="card p-4"><h3 class="text-gray-400 text-sm font-medium">${kpi.title}</h3><p class="text-white text-3xl font-bold mt-1">${formattedValue}</p><p class="mt-2">${changeText}</p></div>`;
+                });
+            }
+
+
+            function renderFullDashboard() {
+                updateKPIs();
+                const heatmapContainer = document.getElementById('heatmapVendas');
+                let heatmapHtml = '<table class="heatmap-table"><thead><tr><th>&nbsp;</th>';
+                simulationData.regioes.forEach(r => heatmapHtml += `<th>${r}</th>`);
+                heatmapHtml += '</tr></thead><tbody>';
+                const allSales = [...simulationData.duralta.vendasRegionais.p2, ...simulationData.duralta.vendasRegionais.p3, ...simulationData.duralta.vendasRegionais.p4];
+                const minSales = Math.min(...allSales), maxSales = Math.max(...allSales);
+                const salesData = [simulationData.duralta.vendasRegionais.p2, simulationData.duralta.vendasRegionais.p3, simulationData.duralta.vendasRegionais.p4];
+                salesData.forEach((periodo, i) => {
+                    heatmapHtml += `<tr><td class="font-bold">P${i+2}</td>`;
+                    periodo.forEach(venda => {
+                        const percentage = (venda - minSales) / (maxSales - minSales) || 0;
+                        const color = `rgba(34, 197, 94, ${percentage})`;
+                        heatmapHtml += `<td style="background-color: ${color}; color: ${percentage > 0.6 ? 'white' : '#111827'}">${venda.toLocaleString('pt-BR')}</td>`;
+                    });
+                    heatmapHtml += '</tr>';
+                });
+                heatmapHtml += '</tbody></table>';
+                heatmapContainer.innerHTML = heatmapHtml;
+
+                const heatmapMsContainer = document.getElementById('heatmapMarketShare');
+                let heatmapMsHtml = '<table class="heatmap-table"><thead><tr><th>&nbsp;</th>';
+                simulationData.regioes.forEach(r => heatmapMsHtml += `<th>${r}</th>`);
+                heatmapMsHtml += '</tr></thead><tbody>';
+                const msData = [[13.38, 36.47, 21.96, 24.95, 23.66, 33.78], [16.26, 41.82, 31.37, 32.19, 24.29, 34.15], [41.65, 33.89, 24.01, 32.97, 17.13, 20.13]];
+                const allMs = msData.flat();
+                const minMs = Math.min(...allMs), maxMs = Math.max(...allMs);
+                msData.forEach((periodo, i) => {
+                    heatmapMsHtml += `<tr><td class="font-bold">P${i+2}</td>`;
+                    periodo.forEach(ms => {
+                        const percentage = (ms - minMs) / (maxMs - minMs) || 0;
+                        const color = `rgba(79, 70, 229, ${percentage})`;
+                        heatmapMsHtml += `<td style="background-color: ${color}; color: ${percentage > 0.6 ? 'white' : '#e5e7eb'}">${ms.toFixed(2)}%</td>`;
+                    });
+                    heatmapMsHtml += '</tr>';
+                });
+                heatmapMsHtml += '</tbody></table>';
+                heatmapMsContainer.innerHTML = heatmapMsHtml;
+
+                createAllCharts();
+                updateCharts(selectedPeriod);
+                generateAllInsights();
+            }
             
-            const addMaterialBtn = document.getElementById('add-material-btn');
-            const materialsBody = document.getElementById('materials-body');
-            const normalizeBtn = document.getElementById('normalize-btn');
-            const mixWarningDiv = document.getElementById('mix-warning');
-            const formatPricesBtn = document.getElementById('format-prices-btn');
-            const monthFilterContainer = document.getElementById('month-filter-container');
-            const monthFilterSection = document.getElementById('month-filter-section');
-
-            const purchasePriceInput = document.getElementById('purchase-price');
-            const variableCostInput = document.getElementById('variable-cost');
-            const variableCostModeSelect = document.getElementById('variable-cost-mode');
-            const fixedCostModeSelect = document.getElementById('fixed-cost-mode');
-            const fixedCostManualInput = document.getElementById('fixed-cost-manual');
-            
-            let fullExtractedData = null;
-            let fullPdfText = null;
-
-            const showError = (message) => {
-                errorMessageDiv.textContent = message;
-                errorMessageDiv.classList.remove('hidden');
-                loader.classList.add('hidden');
-            };
-
-            const clearCharts = () => {
+            function createAllCharts() {
                 Object.values(chartInstances).forEach(chart => chart.destroy());
                 chartInstances = {};
-            };
-            
-            const showAIPlaceholders = () => {
-                const placeholderHTML = `
-                    <div class="flex items-center justify-center p-8">
-                        <div class="flex flex-col items-center">
-                            <div class="w-8 h-8 rounded-full animate-spin small-loader"></div>
-                            <p class="text-blue-400 mt-3">Analisando com IA... Isso pode levar um momento.</p>
-                        </div>
-                    </div>`;
-                document.getElementById('general-analysis-content').innerHTML = placeholderHTML;
-                document.getElementById('critical-points-content').innerHTML = placeholderHTML;
-                document.getElementById('csv-data-content').innerHTML = placeholderHTML;
-                document.getElementById('simulator-analysis-content').innerHTML = placeholderHTML;
-            };
-            
-            const showErrorInAISections = (message) => {
-                const errorHTML = `<div class="text-red-400 bg-red-900/50 p-4 rounded-lg">${message}</div>`;
-                document.getElementById('general-analysis-content').innerHTML = errorHTML;
-                document.getElementById('critical-points-content').innerHTML = errorHTML;
-                document.getElementById('csv-data-content').innerHTML = errorHTML;
-                document.getElementById('simulator-analysis-content').innerHTML = errorHTML;
-            };
 
-            const getPricingParams = () => {
-                const purchasePriceKg = parseFloat(purchasePriceInput.value);
-                const otherVarCostValue = parseFloat(variableCostInput.value);
-                const fixedCostMode = fixedCostModeSelect.value;
-                const fixedCostValue = parseFloat(fixedCostManualInput.value);
-
-                const mixItems = [];
-                const materialRows = materialsBody.querySelectorAll('tr');
-                let totalPercentage = 0;
-                materialRows.forEach(row => {
-                    const percentage = parseFloat(row.querySelector('.material-percentage').value) || 0;
-                    totalPercentage += percentage;
-                    mixItems.push({
-                        name: row.querySelector('.material-name').value,
-                        percentage: percentage,
-                        sellPrice: parseFloat(row.querySelector('.material-sell-price').value) || 0,
-                    });
-                });
-
-                if (isNaN(purchasePriceKg) || purchasePriceKg <= 0) throw new Error("Preço da matéria-prima é obrigatório e deve ser positivo.");
-                if (isNaN(otherVarCostValue) || otherVarCostValue < 0) throw new Error("Outros custos variáveis são obrigatórios.");
-                if (fixedCostMode === 'manual' && (isNaN(fixedCostValue) || fixedCostValue < 0)) throw new Error("Custo fixo manual é obrigatório e não pode ser negativo.");
-                if (mixItems.length === 0) throw new Error("Adicione pelo menos um item ao mix de produtos.");
-                if (totalPercentage === 0) throw new Error("A soma das porcentagens do mix não pode ser zero.");
-                if (!mixItems.some(item => item.sellPrice > 0 && item.percentage > 0)) throw new Error("Pelo menos um item do mix deve ter preço de venda e porcentagem maiores que zero.");
-
-                return {
-                    purchasePriceKg,
-                    otherVarCostMode: variableCostModeSelect.value,
-                    otherVarCostValue,
-                    fixedCostMode,
-                    fixedCostValue: fixedCostMode === 'manual' ? fixedCostValue : null,
-                    mixItems
+                Chart.defaults.color = '#9ca3af'; Chart.defaults.borderColor = '#374151';
+                const commonLineOptions = { tension: 0.3, borderWidth: 3, pointBackgroundColor: '#fff', pointRadius: 4, pointHoverRadius: 6 };
+                
+                const chartsToCreate = {
+                    lucroAcaoChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Lucro Líquido ($)', data: simulationData.duralta.lucroLiquido, backgroundColor: 'rgba(79, 70, 229, 0.7)', yAxisID: 'y' }, { label: 'Valor da Ação ($)', data: simulationData.duralta.valorAcao, type: 'line', borderColor: '#f59e0b', yAxisID: 'y1', ...commonLineOptions }] }, options: { scales: { y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Lucro Líquido' } }, y1: { position: 'right', title: { display: true, text: 'Valor da Ação' }, grid: { drawOnChartArea: false } } } } },
+                    marketSharePrecoChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Market Share (%)', data: simulationData.duralta.marketShare, backgroundColor: 'rgba(16, 185, 129, 0.7)', yAxisID: 'y' }, { label: 'Preço Médio Duralta ($)', data: [463, 471, 517], type: 'line', borderColor: '#ec4899', yAxisID: 'y1', ...commonLineOptions }] }, options: { scales: { y: { position: 'left', title: { display: true, text: 'Market Share (%)' } }, y1: { position: 'right', title: { display: true, text: 'Preço Médio ($)' }, grid: { drawOnChartArea: false } } } } },
+                    paretoLucroChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Lucro por Período', data: simulationData.duralta.lucroLiquido, backgroundColor: '#3b82f6' }, { label: '% Acumulada', data: simulationData.duralta.lucroLiquido.map((val, i) => simulationData.duralta.lucroLiquido.slice(0, i + 1).reduce((a, b) => a + b, 0) / simulationData.duralta.lucroLiquido.reduce((a, b) => a + b, 0) * 100), type: 'line', borderColor: '#ef4444', yAxisID: 'y1', ...commonLineOptions }] }, options: { scales: { y: { title: { display: true, text: 'Lucro ($)' } }, y1: { position: 'right', max: 100, title: { display: true, text: '% Acumulada' }, grid: { drawOnChartArea: false } } } } },
+                    regionalSalesChart: { type: 'bar', data: { labels: simulationData.regioes, datasets: [{ label: 'Duralta', data: simulationData.duralta.vendasRegionais.p4, backgroundColor: '#4f46e5' }, { label: 'Luminous SA', data: simulationData.competitorsP4['Luminous SA'].vendasRegionais, backgroundColor: '#059669' }, { label: 'Empresa 5', data: simulationData.competitorsP4['Empresa 5'].vendasRegionais, backgroundColor: '#db2777' }] } },
+                    precoVendasChart: { type: 'bar', data: { labels: simulationData.regioes, datasets: [ { label: 'Unidades Vendidas', data: simulationData.duralta.vendasRegionais.p4, backgroundColor: '#22d3ee', yAxisID: 'y', }, { label: 'Preço de Venda ($)', data: simulationData.duralta.precosRegionais.p4, type: 'line', borderColor: '#f97316', yAxisID: 'y1', ...commonLineOptions } ] }, options: { scales: { y: { position: 'left', title: { display: true, text: 'Unidades Vendidas' } }, y1: { position: 'right', title: { display: true, text: 'Preço de Venda ($)' }, grid: { drawOnChartArea: false } } } } },
+                    marketSharePieChart: { type: 'pie', data: { labels: Object.keys(simulationData.competitorsP4), datasets: [{ label: 'Market Share (P4)', data: Object.values(simulationData.competitorsP4).map(c => c.marketShare), backgroundColor: ['#4f46e5', '#059669', '#f59e0b', '#db2777'] }] } },
+                    demandaNaoAtendidaChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Demanda Total', data: simulationData.duralta.demanda, backgroundColor: '#8b5cf6' }, { label: 'Vendas Realizadas', data: simulationData.duralta.vendas, backgroundColor: '#10b981' }] } },
+                    marketShareTimelineChart: { type: 'line', data: { labels: simulationData.periodos, datasets: [{ label: 'Duralta', data: simulationData.duralta.marketShare, borderColor: '#4f46e5', ...commonLineOptions }, { label: 'Luminous SA', data: simulationData.competitors['Luminous SA'].marketShare, borderColor: '#059669', ...commonLineOptions }, { label: 'Sweet Tooth', data: simulationData.competitors['Sweet Tooth'].marketShare, borderColor: '#f59e0b', ...commonLineOptions }, { label: 'Empresa 5', data: simulationData.competitors['Empresa 5'].marketShare, borderColor: '#db2777', ...commonLineOptions }] }, options: { scales: { y: { title: { display: true, text: 'Market Share (%)' } } } } },
+                    marcaPropagandaChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Nº Campanhas', data: simulationData.duralta.marketing.propaganda, backgroundColor: '#8b5cf6', yAxisID: 'y' }, { label: 'Força da Marca', data: simulationData.duralta.marketing.forcaMarca, type: 'line', stepped: true, borderColor: '#f87171', yAxisID: 'y1', ...commonLineOptions }] }, options: { scales: { y: { position: 'left', title: { display: true, text: 'Nº Campanhas' } }, y1: { position: 'right', title: { display: true, text: 'Força da Marca (2=Forte)' }, grid: { drawOnChartArea: false }, ticks: { stepSize: 1 } } } } },
+                    productionCapacityChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Produção Real', data: simulationData.duralta.producao, backgroundColor: 'rgba(14, 165, 233, 0.7)' }, { label: 'Capacidade Máxima (com HE)', data: simulationData.duralta.capacidade, type: 'line', borderColor: '#e11d48', ...commonLineOptions, fill: false }] } },
+                    materiaPrimaAreaChart: { type: 'line', data: { labels: simulationData.periodos, datasets: [{ label: 'Programada', data: simulationData.duralta.operacional.mp_a_programada, borderColor: '#1d4ed8', fill: true, backgroundColor: '#1d4ed833', ...commonLineOptions}, { label: 'Emergencial', data: simulationData.duralta.operacional.mp_a_emergencial, borderColor: '#be123c', fill: true, backgroundColor: '#be123c33', ...commonLineOptions }] }, options: { scales: { y: { stacked: true, title: { display: true, text: 'Unidades Consumidas' } } } } },
+                    maquinasChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Qtd Máquinas Alfa', data: simulationData.duralta.maquinas.alfa, backgroundColor: '#d946ef', yAxisID: 'y' }, { label: 'Idade Média', data: simulationData.duralta.maquinas.idadeMedia, type: 'line', borderColor: '#e11d48', yAxisID: 'y1', ...commonLineOptions }] }, options: { scales: { y: { position: 'left', title: { display: true, text: 'Quantidade' } }, y1: { position: 'right', title: { display: true, text: 'Idade Média (Períodos)' }, grid: { drawOnChartArea: false } } } } },
+                    manutencaoChart: { type: 'line', data: { labels: simulationData.periodos, datasets: [{ label: 'Custo Manutenção ($)', data: simulationData.duralta.maquinas.custoManutencao, borderColor: '#f97316', ...commonLineOptions, fill: true, backgroundColor: 'rgba(249, 115, 22, 0.2)' }] } },
+                    incomeStatementChart: { type: 'line', data: { labels: simulationData.periodos, datasets: [{ label: 'Lucro Bruto', data: simulationData.duralta.lucroBruto, borderColor: '#22c55e', ...commonLineOptions }, { label: 'Lucro Operacional', data: simulationData.duralta.lucroOperacional, borderColor: '#3b82f6', ...commonLineOptions }, { label: 'Lucro Líquido', data: simulationData.duralta.lucroLiquido, borderColor: '#f59e0b', ...commonLineOptions }] } },
+                    cashflowWaterfallP4Chart: { type: 'bar', data: { labels: ['Saldo Inicial', 'Operacional', 'Investimento', 'Financiamento', 'Saldo Final'], datasets: [{ label: 'Fluxo de Caixa (P4)', data: [simulationData.duralta.fluxoCaixaP4.inicial, simulationData.duralta.fluxoCaixaP4.operacional, simulationData.duralta.fluxoCaixaP4.investimento, simulationData.duralta.fluxoCaixaP4.financiamento, simulationData.duralta.fluxoCaixaP4.final].reduce((acc, val, i) => { const prev = i > 0 ? acc[i - 1][1] : 0; acc.push([prev, prev + val]); return acc; }, []), backgroundColor: ['#16a34a', '#16a34a', '#ef4444', '#3b82f6', '#16a34a'] }] }, options: { indexAxis: 'y' } },
+                    assetCompositionChart: { type: 'doughnut', data: { labels: ['Caixa e Aplicações', 'Contas a Receber', 'Estoque', 'Imobilizado'], datasets: [{ data: [simulationData.duralta.balancoP4.caixa + simulationData.duralta.balancoP4.aplicacao, simulationData.duralta.balancoP4.clientes, simulationData.duralta.balancoP4.estoque, simulationData.duralta.balancoP4.imobilizado], backgroundColor: ['#0ea5e9', '#f97316', '#eab308', '#8b5cf6'] }] } },
+                    rhChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Nº Empregados', data: simulationData.duralta.rh.empregados, backgroundColor: '#fbbf24', yAxisID: 'y' }, { label: 'Produtividade', data: simulationData.duralta.produtividade, type: 'line', borderColor: '#22c55e', yAxisID: 'y1', ...commonLineOptions }] }, options: { scales: { y: { position: 'left', title: { display: true, text: 'Nº Empregados' } }, y1: { position: 'right', title: { display: true, text: 'Índice' }, grid: { drawOnChartArea: false } } } } },
+                    rhInvestmentScatterChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Investimento em Treinamento (%)', data: simulationData.duralta.rh.treinamento, backgroundColor: '#a855f7', yAxisID: 'y'}, { label: 'Índice de Produtividade', data: simulationData.duralta.produtividade, type: 'line', borderColor: '#22c55e', yAxisID: 'y1', ...commonLineOptions }] }, options: { scales: { y: { position: 'left', title: { display: true, text: 'Investimento em Treinamento (%)' } }, y1: { position: 'right', title: { display: true, text: 'Índice de Produtividade' }, grid: { drawOnChartArea: false } } } } },
+                    motivationPlrChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Investimento em PLR (%)', data: [simulationData.duralta.decisoes.p2.plr, simulationData.duralta.decisoes.p3.plr, simulationData.duralta.decisoes.p4.plr].map(p => p === 0 ? null : p), backgroundColor: '#f43f5e', yAxisID: 'y' }, { label: 'Motivação', data: simulationData.duralta.rh.motivacao, type: 'line', stepped: true, borderColor: '#facc15', yAxisID: 'y1', ...commonLineOptions }] }, options: { scales: { y: { position: 'left', title: { display: true, text: 'PLR (%)' } }, y1: { position: 'right', title: { display: true, text: 'Nível de Motivação' }, grid: { drawOnChartArea: false }, ticks: { stepSize: 1, callback: (v) => ['','Péssimo','Ruim','Regular','Bom','Ótimo'][v] || '' } } } } },
+                    macroChart: { type: 'line', data: { labels: simulationData.periodos, datasets: [{ label: 'Selic (%)', data: simulationData.mercado.macro.selic, borderColor: '#38bdf8', ...commonLineOptions }, { label: 'Inflação (%)', data: simulationData.mercado.macro.inflacao, borderColor: '#f472b6', ...commonLineOptions }, { label: 'Inadimplência Média (%)', data: simulationData.mercado.macro.inadimplencia, borderColor: '#facc15', ...commonLineOptions }] } },
+                    lucroAlavancagemChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Lucro Operacional ($)', data: simulationData.duralta.lucroOperacional, backgroundColor: 'rgba(34, 197, 94, 0.7)', yAxisID: 'y' }, { label: 'Endividamento Total ($)', data: simulationData.duralta.endividamentoTotal, type: 'line', borderColor: '#ef4444', yAxisID: 'y1', ...commonLineOptions }, { label: 'Preço Médio ($)', data: [simulationData.duralta.decisoes.p2.precoMedio, simulationData.duralta.decisoes.p3.precoMedio, simulationData.duralta.decisoes.p4.precoMedio], type: 'line', borderColor: '#3b82f6', yAxisID: 'y2', ...commonLineOptions }] }, options: { scales: { y: { position: 'left', title: { display: true, text: 'Lucro Operacional' } }, y1: { position: 'right', title: { display: true, text: 'Endividamento' }, grid: { drawOnChartArea: false } }, y2: { display: false } } } },
+                    receitaRegiaoChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: simulationData.regioes.map((regiao, i) => ({ label: regiao, data: [simulationData.duralta.receitaPorRegiao.p2[i], simulationData.duralta.receitaPorRegiao.p3[i], simulationData.duralta.receitaPorRegiao.p4[i]], backgroundColor: `hsl(${i * 60}, 70%, 50%)` })) }, options: { scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Receita ($)' } } } } },
+                    custosEmergenciaisChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Custo Compra Emergencial ($)', data: simulationData.duralta.custoCompraEmergencial, backgroundColor: '#f97316' }, { label: 'Custo Manutenção ($)', data: simulationData.duralta.maquinas.custoManutencao, backgroundColor: '#f43f5e' }] }, options: { scales: { y: { title: { display: true, text: 'Custo ($)' } } } } },
+                    motivacaoFatoresChart: { type: 'bar', data: { labels: simulationData.periodos, datasets: [{ label: 'Motivação (Nível)', data: simulationData.duralta.rh.motivacao, backgroundColor: 'rgba(234, 179, 8, 0.7)', yAxisID: 'y' }, { label: 'Produção Extra (%)', data: simulationData.duralta.rh.prodExtra, type: 'line', borderColor: '#ef4444', yAxisID: 'y1', ...commonLineOptions }, { label: 'Salário Base ($)', data: simulationData.duralta.rh.salario, type: 'line', borderColor: '#3b82f6', yAxisID: 'y2', ...commonLineOptions, pointStyle: 'rect' }] }, options: { scales: { y: { position: 'left', title: { display: true, text: 'Nível Motivação' }, ticks: { stepSize: 1, callback: (v) => ['','Péssimo','Ruim','Regular','Bom','Ótimo'][v] || '' } }, y1: { position: 'right', title: { display: true, text: '% Produção Extra' }, grid: { drawOnChartArea: false } }, y2: { position: 'right', title: {display: true, text: 'Salário ($)'}, grid: {drawOnChartArea: false}, ticks: {display: false} } } } }
                 };
-            };
+                
+                const financeRadarData = { labels: ['Liquidez', 'ROE', 'Margem Líquida', 'Alavancagem (Invertido)'], datasets: [] };
+                const financeCompanyColors = { 'Duralta': '#4f46e5', 'Luminous SA': '#059669', 'Sweet Tooth': '#f59e0b', 'Empresa 5': '#db2777' };
+                for(const name in simulationData.competitorsP4){
+                    const company = simulationData.competitorsP4[name];
+                    financeRadarData.datasets.push({
+                        label: name,
+                        data: [ company.liquidez, company.roe, company.margemLucro, (1 / company.alavancagem)],
+                        borderColor: financeCompanyColors[name], backgroundColor: `${financeCompanyColors[name]}33`
+                    });
+                }
+                chartsToCreate.radarChart = { type: 'radar', data: financeRadarData, options: { scales: { r: { suggestedMin: 0, suggestedMax: 1, ticks: { display: false } } } } };
+                chartsToCreate.financeRadarChart = { type: 'radar', data: financeRadarData, options: { scales: { r: { suggestedMin: 0 } } } };
+
+                for (const id in chartsToCreate) {
+                    const ctx = document.getElementById(id).getContext('2d');
+                    const chartConfig = chartsToCreate[id];
+                    chartInstances[id] = new Chart(ctx, chartConfig);
+                    chartInstances[id].originalConfig = JSON.parse(JSON.stringify(chartConfig));
+                }
+                
+                const competitorTable = document.getElementById('competitor-table');
+                competitorTable.innerHTML = '';
+                for (const name in simulationData.competitorsP4) {
+                    const data = simulationData.competitorsP4[name];
+                    competitorTable.innerHTML += `<tr class="bg-gray-800 border-b-2 border-gray-900 hover:bg-gray-700"><th class="px-4 py-3 font-medium" style="color:${financeCompanyColors[name]}">${name}</th><td class="px-4 py-3 text-right">$${data.valorAcao.toFixed(2)}</td><td class="px-4 py-3 text-right">${data.marketShare.toFixed(2)}%</td><td class="px-4 py-3 text-right">${data.margemLucro.toFixed(2)}%</td></tr>`;
+                }
+            }
             
-            const handleAnalysis = async () => {
-                let pricingParams;
-                try {
-                    pricingParams = getPricingParams();
-                    
-                    const apiKey = apiKeyInput.value;
-                    const file = fileInput.files[0];
-
-                    if (!apiKey) { showError('Por favor, insira a sua chave da API do Gemini.'); return; }
-                    if (!file) { showError('Por favor, selecione um ficheiro PDF.'); return; }
-
-                    loader.classList.remove('hidden');
-                    resultsContainer.classList.add('hidden');
-                    errorMessageDiv.classList.add('hidden');
-                    clearCharts();
-                    
-                    const filteredData = filterDataBySelectedMonths(fullExtractedData);
-                    if (filteredData.labels.length === 0) {
-                        showError("Por favor, selecione pelo menos um mês para análise.");
-                        return;
-                    }
-                    
-                    await runAnalysisWithCurrentFilters(pricingParams, apiKey, filteredData);
-
-                } catch (error) {
-                    console.error('Erro de validação:', error);
-                    showError(error.message);
-                }
-            };
-            
-            const runAnalysisWithCurrentFilters = async (pricingParams, apiKey, dataForAI) => {
-                if (!fullExtractedData) return;
-
-                loader.classList.remove('hidden');
-                loaderText.textContent = 'Filtrando dados e recalculando...';
-
-                const filteredData = filterDataBySelectedMonths(fullExtractedData);
-
-                renderSummaryPanel(filteredData);
-                renderMonthlySummaryPanel(filteredData);
+            function updateCharts(period) {
+                const periodIndex = period === 'all' ? -1 : parseInt(period, 10);
                 
-                const pricingResultsByMonth = calculateInferredProductionAndMargins(filteredData, pricingParams);
-                
-                renderChartsAndProjections(filteredData, pricingResultsByMonth);
-                renderPricingResultsTable(pricingResultsByMonth, filteredData.labels, filteredData);
-                document.getElementById('pricing-results-section').classList.remove('hidden');
-                
-                renderBreakEvenProjection(filteredData);
-                document.getElementById('breakeven-projection-section').classList.remove('hidden');
+                for (const chartId in chartInstances) {
+                    const chart = chartInstances[chartId];
+                    const originalConfig = chart.originalConfig; 
 
-                resultsContainer.classList.remove('hidden');
-                loader.classList.add('hidden');
-
-                if (apiKey !== null && dataForAI) {
-                    showAIPlaceholders();
-                    try {
-                        loaderText.textContent = 'Gerando análise aprofundada...';
-                        const aiAnalysis = await callAIFinancialAnalyst(dataForAI, apiKey, pricingParams); 
-                        renderGeminiAnalysis(aiAnalysis);
-                    } catch (aiError) {
-                        console.error('Erro na análise da IA:', aiError);
-                        showErrorInAISections(aiError.message || 'Ocorreu um erro ao obter a análise da IA.');
+                    if (originalConfig && JSON.stringify(originalConfig.data.labels) === JSON.stringify(simulationData.periodos)) {
+                        
+                        if (periodIndex !== -1) {
+                            chart.data.labels = [originalConfig.data.labels[periodIndex]];
+                            chart.data.datasets.forEach((dataset, i) => {
+                                const originalDataset = originalConfig.data.datasets[i];
+                                if (originalDataset && originalDataset.data) {
+                                    dataset.data = [originalDataset.data[periodIndex]];
+                                }
+                            });
+                        } else { 
+                            chart.data.labels = originalConfig.data.labels;
+                            chart.data.datasets.forEach((dataset, i) => {
+                                 const originalDataset = originalConfig.data.datasets[i];
+                                 if (originalDataset && originalDataset.data) {
+                                    dataset.data = originalDataset.data;
+                                 }
+                            });
+                        }
+                        chart.update();
                     }
-                }
-            };
-
-            const filterDataBySelectedMonths = (data) => {
-                const selectedMonths = Array.from(monthFilterContainer.querySelectorAll('input:checked')).map(cb => cb.value);
-                
-                if (selectedMonths.length === 0) {
-                    const emptyData = { labels: [], datasets: {} };
-                    for (const key in data.datasets) {
-                        emptyData.datasets[key] = [];
-                    }
-                    return emptyData;
-                }
-
-                const filteredIndices = selectedMonths.map(month => data.labels.indexOf(month)).filter(index => index !== -1);
-
-                const filteredData = {
-                    labels: filteredIndices.map(index => data.labels[index]),
-                    datasets: {}
-                };
-
-                for (const key in data.datasets) {
-                    if (Array.isArray(data.datasets[key])) {
-                        filteredData.datasets[key] = filteredIndices.map(index => data.datasets[key][index]);
-                    }
-                }
-                return filteredData;
-            };
-
-            const calculateInferredProductionAndMargins = (dreData, pricingParams) => {
-                const results = [];
-                dreData.labels.forEach((month, i) => {
-                    const cvTotalMes = dreData.datasets.variableCosts[i];
-                    if (cvTotalMes === null || cvTotalMes <= 0) {
-                        results.push(null);
-                        return;
-                    }
-
-                    let cvuBase = pricingParams.purchasePriceKg + (pricingParams.otherVarCostMode === 'perkg' ? pricingParams.otherVarCostValue : 0);
-                    let producaoEstimadaKg = cvuBase > 0 ? cvTotalMes / cvuBase : 0;
-
-                    if (pricingParams.otherVarCostMode === 'total' && producaoEstimadaKg > 0) {
-                        cvuBase = pricingParams.purchasePriceKg + (pricingParams.otherVarCostValue / producaoEstimadaKg);
-                        producaoEstimadaKg = cvuBase > 0 ? cvTotalMes / cvuBase : 0;
-                    }
-                    
-                    let receitaMixTotal = 0;
-                    pricingParams.mixItems.forEach(item => {
-                        const qtyItem = producaoEstimadaKg * (item.percentage / 100);
-                        receitaMixTotal += qtyItem * item.sellPrice;
-                    });
-                    
-                    const mcMixTotal = receitaMixTotal - cvTotalMes;
-                    const mcMixPercent = receitaMixTotal > 0 ? mcMixTotal / receitaMixTotal : 0;
-
-                    const fixedCost = pricingParams.fixedCostMode === 'dre' ? dreData.datasets.fixedCosts[i] : pricingParams.fixedCostValue;
-                    
-                    const pe_rs = mcMixPercent > 0 ? fixedCost / mcMixPercent : null;
-                    
-                    const precoVendaMedioMix = pricingParams.mixItems.reduce((sum, item) => sum + (item.sellPrice * (item.percentage / 100)), 0);
-                    const mcPorKg = precoVendaMedioMix - cvuBase;
-                    const pe_kg = mcPorKg > 0 ? fixedCost / mcPorKg : null;
-
-                    results.push({
-                        producaoEstimadaKg,
-                        cvuBase,
-                        receitaMixTotal,
-                        mcMixTotal,
-                        mcMixPercent,
-                        pe_rs,
-                        pe_kg
-                    });
-                });
-                return results;
-            };
-
-            const callApi = async (apiKey, prompt, isJson = false) => {
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-                 const requestBody = {
-                    contents: [{ parts: [{ text: prompt }] }],
-                    safetySettings: [
-                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                    ]
-                };
-
-                if (isJson) {
-                    requestBody.generationConfig = { responseMimeType: "application/json" };
-                }
-
-                try {
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(requestBody)
-                    });
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(`Erro na API do Gemini: ${errorData.error.message}`);
-                    }
-                    const data = await response.json();
-                    
-                    if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
-                        return data.candidates[0].content.parts[0].text;
-                    } else {
-                        console.error("Resposta da API inválida:", data);
-                        throw new Error("A resposta da API do Gemini não continha o conteúdo esperado.");
-                    }
-                } catch (error) {
-                     console.error("Erro ao chamar a API do Gemini:", error);
-                     throw new Error("Falha na comunicação com a API do Gemini. Verifique a sua chave e tente novamente.");
                 }
             }
 
-            const getStructuredDataFromAI = async (dreText, apiKey) => {
-                const prompt = `
-                    Analise o seguinte texto de um DRE (Demonstrativo de Resultado do Exercício) e extraia os dados em um formato JSON.
-                    O JSON deve ter a seguinte estrutura:
-                    {
-                      "labels": ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"],
-                      "datasets": {
-                        "netRevenue": [valor1, valor2, ...],
-                        "variableCosts": [valor1, valor2, ...],
-                        "contributionMargin": [valor1, valor2, ...],
-                        "fixedCosts": [valor1, valor2, ...],
-                        "operationalResult": [valor1, valor2, ...],
-                        "nonOperationalResult": [valor1, valor2, ...],
-                        "netProfit": [valor1, valor2, ...],
-                        "rawMaterial": [valor1, valor2, ...],
-                        "personnelCosts": [valor1, valor2, ...],
-                        "occupationCosts": [valor1, valor2, ...],
-                        "servicesCosts": [valor1, valor2, ...]
-                      }
-                    }
-
-                    - O array "labels" DEVE conter todos os 12 meses do ano, na ordem.
-                    - Cada array de valor em "datasets" deve ter 12 elementos, um para cada mês.
-                    - **Atenção:** O texto do DRE pode não ter dados para todos os meses. Se uma coluna de mês estiver faltando no texto, ou se uma linha de dados começar com vírgulas (ex: ',,73.328,84'), isso indica que os primeiros meses não têm dados. Preencha os valores para esses meses como 'null'. Por exemplo, no texto fornecido, a maioria dos dados começa em Fevereiro, então o valor para Janeiro deve ser 'null'.
-                    - Para "variableCosts", use a linha que começa com "(-) Custos Variáveis".
-                    - Some os valores de "Matéria Prima Zamack 05" e "Matéria Prima Zamack Jóia" para obter o valor de "rawMaterial".
-                    - Some os valores de "Gastos com Pessoal", "Gastos com Ocupação" e "Gastos com Serviços de Terceiros" para obter o valor de "fixedCosts".
-                    - Retorne APENAS o JSON, sem nenhum texto ou formatação adicional.
-
-                    Texto do DRE:
-                    ---
-                    ${dreText}
-                    ---
-                `;
+            // --- LÓGICA DA IA ---
+            async function callGeminiApi(prompt) {
+                const model = 'gemini-2.5-flash-preview-05-20';
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
                 
-                const jsonResponse = await callApi(apiKey, prompt, true);
-                try {
-                    return JSON.parse(jsonResponse);
-                } catch (e) {
-                    console.error("Erro ao parsear JSON da IA:", e, "Resposta recebida:", jsonResponse);
-                    throw new Error("A IA retornou um formato de dados inválido.");
-                }
-            };
-
-            const callAIFinancialAnalyst = async (filteredData, apiKey, pricingParams) => {
-                 const prompt = `
-                    Você é um analista financeiro sênior. Sua tarefa é analisar os dados financeiros de um período selecionado e os parâmetros de mix de produtos fornecidos por um usuário.
-                    Com base nos dados, gere uma análise completa em formato JSON. A resposta DEVE ser um único objeto JSON com a seguinte estrutura:
-                    {
-                      "summary": "Um resumo executivo em markdown sobre a saúde financeira, destacando tendências de receita, custos e lucratividade para o período selecionado.",
-                      "recommendations": "Uma lista em markdown com pontos críticos, inconsistências e recomendações práticas para melhorar os resultados.",
-                      "csvData": "Uma tabela em formato CSV contendo os dados chave do DRE (Receita Líquida, Custos Variáveis, Custos Fixos, Lucro Líquido) com os meses nas linhas.",
-                      "simulatorAnalysis": "Uma análise em markdown sobre a simulação. Compare a receita e margem de contribuição 'Realizada' (do DRE) com a 'Simulada' (do mix). Se a simulação for melhor, sugira que os preços de venda podem estar baixos ou o mix de vendas real é menos rentável. Se o realizado for melhor, elogie a performance de vendas."
-                    }
-
-                    Instruções importantes:
-                    1.  **Use os dados do Mix de Produtos:** Compare as projeções baseadas no mix de produtos do usuário com os dados reais do DRE. Destaque qualquer divergência significativa na margem de contribuição.
-                    2.  **Seja Claro e Direto:** Use uma linguagem de negócios acessível.
-                    3.  **Formato Markdown:** Para "summary", "recommendations" e "simulatorAnalysis", use markdown para formatar o texto (e.g., \`* item de lista\`, \`**negrito**\`). As quebras de linha dentro das strings JSON devem ser escapadas como \\n.
-                    4.  **Formato CSV:** Para "csvData", a primeira linha deve ser o cabeçalho (Mês, Receita Líquida, etc.).
-
-                    ---
-                    Dados Financeiros para Análise (Período Selecionado):
-                    \`\`\`json
-                    ${JSON.stringify(filteredData)}
-                    \`\`\`
-                    ---
-                    Dados de precificação e mix (entrada do usuário):
-                    \`\`\`json
-                    ${JSON.stringify(pricingParams, null, 2)}
-                    \`\`\`
-                `;
-                const jsonResponse = await callApi(apiKey, prompt, true);
-                try {
-                    return JSON.parse(jsonResponse);
-                } catch (e) {
-                    console.error("Erro ao parsear JSON da Análise Financeira:", e, "Resposta recebida:", jsonResponse);
-                    throw new Error("A IA retornou um formato de análise inválido.");
-                }
-            };
-            
-            const renderGeminiAnalysis = (analysis) => {
-                const { summary, recommendations, csvData, simulatorAnalysis } = analysis;
-
-                const markdownToHtml = (md) => {
-                     return md
-                        .replace(/\n\n/g, '<br><br>') // Handle paragraph breaks
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                        .replace(/^\s*-\s*(.*)/gm, '<li class="ml-4">$1</li>')
-                        .replace(/(\<li.*\>.*<\/li\>)/gs, '<ul class="list-disc pl-5">$1</ul>');
-                };
-
-                document.getElementById('general-analysis-content').innerHTML = markdownToHtml(summary || "Nenhum sumário foi gerado.");
-                document.getElementById('critical-points-content').innerHTML = markdownToHtml(recommendations || "Nenhuma recomendação foi gerada.");
-                document.getElementById('simulator-analysis-content').innerHTML = markdownToHtml(simulatorAnalysis || "Nenhuma análise da simulação foi gerada.");
-                
-                const csvContentDiv = document.getElementById('csv-data-content');
-                if (csvData) {
-                    csvContentDiv.innerHTML = `<h4 class="text-lg font-semibold text-white">Dados Tabulares</h4><pre><code>${csvData}</code></pre>`;
-                } else {
-                    csvContentDiv.innerHTML = "<p>Nenhum dado tabular foi gerado.</p>";
-                }
-            };
-
-            const extractPdfText = async (typedarray) => {
-                const pdf = await pdfjsLib.getDocument(typedarray).promise;
-                let textFromPdfJs = '';
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const textContent = await page.getTextContent();
-                    textFromPdfJs += textContent.items.map(item => item.str).join('\n');
-                }
-
-                const hasNumbers = /-?\d{1,3}(?:\.\d{3})*,\d{2}/.test(textFromPdfJs);
-                const hasMonths = /janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro/i.test(textFromPdfJs);
-
-                if (textFromPdfJs.length > 100 && hasNumbers && hasMonths) {
-                    console.log("PDF.js text extraction successful.");
-                    return textFromPdfJs;
-                }
-
-                console.warn("PDF.js extraction failed or text is insufficient. Falling back to OCR.");
-                loaderText.textContent = 'Texto do PDF ilegível, usando OCR...';
-                
-                const worker = await Tesseract.createWorker('por');
-                let textFromOcr = '';
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const viewport = page.getViewport({ scale: 2.0 });
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-                    await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    const { data: { text } } = await worker.recognize(canvas);
-                    textFromOcr += text + '\n';
-                }
-                await worker.terminate();
-                console.log("OCR extraction finished.");
-                return textFromOcr;
-            };
-
-            const renderSummaryPanel = (data) => {
-                const summaryPanel = document.getElementById('summary-panel');
-                const summaryContent = document.getElementById('summary-content');
-
-                if (!data || !data.datasets) {
-                    summaryPanel.classList.add('hidden');
-                    return;
-                }
-
-                const sum = (arr) => arr ? arr.reduce((acc, val) => acc + (val || 0), 0) : 0;
-                const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-                const totalNetRevenue = sum(data.datasets.netRevenue);
-                const totalVariableCosts = sum(data.datasets.variableCosts);
-                const totalFixedCosts = sum(data.datasets.fixedCosts);
-                const totalNetProfit = sum(data.datasets.netProfit);
-
-                const summaryItems = [
-                    { label: 'Total Receita Líquida', value: formatCurrency(totalNetRevenue), color: 'text-green-400' },
-                    { label: 'Total Custos Variáveis', value: formatCurrency(totalVariableCosts), color: 'text-yellow-400' },
-                    { label: 'Total Custos Fixos', value: formatCurrency(totalFixedCosts), color: 'text-orange-400' },
-                    { label: 'Total Lucro Líquido', value: formatCurrency(totalNetProfit), color: totalNetProfit >= 0 ? 'text-green-400' : 'text-red-400' }
-                ];
-
-                summaryContent.innerHTML = summaryItems.map(item => `
-                    <div class="bg-gray-900/50 p-4 rounded-lg">
-                        <p class="text-sm text-gray-400">${item.label}</p>
-                        <p class="text-2xl font-bold ${item.color}">${item.value}</p>
-                    </div>
-                `).join('');
-
-                summaryPanel.classList.remove('hidden');
-            };
-            
-            const renderMonthlySummaryPanel = (data) => {
-                const monthlyPanel = document.getElementById('monthly-summary-panel');
-                const monthlyContent = document.getElementById('monthly-summary-content');
-
-                if (!data || !data.labels || data.labels.length === 0) {
-                    monthlyPanel.classList.add('hidden');
-                    return;
-                }
-                const formatCurrency = (value) => value !== null && !isNaN(value) ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A';
-
-                monthlyContent.innerHTML = data.labels.map((label, i) => `
-                    <div class="flex-shrink-0 w-full bg-gray-900/50 p-4 rounded-lg">
-                        <h4 class="text-lg font-bold text-white mb-3">${label}</h4>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex justify-between"><span>Receita Líquida:</span> <span class="font-semibold text-green-400">${formatCurrency(data.datasets.netRevenue[i])}</span></div>
-                            <div class="flex justify-between"><span>Custos Variáveis:</span> <span class="font-semibold text-yellow-400">${formatCurrency(data.datasets.variableCosts[i])}</span></div>
-                            <div class="flex justify-between"><span>Custos Fixos:</span> <span class="font-semibold text-orange-400">${formatCurrency(data.datasets.fixedCosts[i])}</span></div>
-                            <div class="flex justify-between border-t border-gray-700 pt-2 mt-2"><span>Lucro Líquido:</span> <span class="font-bold ${data.datasets.netProfit[i] >= 0 ? 'text-green-400' : 'text-red-400'}">${formatCurrency(data.datasets.netProfit[i])}</span></div>
-                        </div>
-                    </div>
-                `).join('');
-                
-                monthlyPanel.classList.remove('hidden');
-            };
-
-            const renderChartsAndProjections = (data, pricingResults) => {
-                renderSimulatorCharts(data, pricingResults);
-                renderOperationalNetMarginChart(data);
-                renderResultQualityChart(data);
-                renderVerticalAnalysisChart(data);
-                renderHorizontalAnalysisChart(data);
-                renderCostsCompositionChart(data.datasets);
-                renderFixedCostsCompositionChart(data.datasets);
-            };
-            
-            const createChart = (ctx, config) => {
-                const chartId = ctx.canvas.id;
-                if (chartInstances[chartId]) chartInstances[chartId].destroy();
-                chartInstances[chartId] = new Chart(ctx, config);
-            };
-            
-            const chartDefaultOptions = {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { 
-                    legend: { position: 'top', labels: { color: '#d1d5db' } },
-                    datalabels: { display: false }
-                },
-                scales: { 
-                    y: { beginAtZero: true, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
-                    x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
-                }
-            };
-
-            const renderSimulatorCharts = (data, pricingResults) => {
-                const { labels, datasets } = data;
-                const netRevenue = datasets.netRevenue || [];
-                const contributionMargin = datasets.contributionMargin || [];
-                const simulatedRevenue = pricingResults.map(r => r ? r.receitaMixTotal : null);
-                const simulatedMargin = pricingResults.map(r => r ? r.mcMixTotal : null);
-                const breakEvenPoints = pricingResults.map(r => r ? r.pe_rs : null);
-
-                // Revenue Chart
-                const revCtx = document.getElementById('revenueSimulatorChart').getContext('2d');
-                createChart(revCtx, {
-                    type: 'bar',
-                    data: {
-                        labels,
-                        datasets: [
-                            { label: 'Receita Realizada (DRE)', data: netRevenue, backgroundColor: 'rgba(59, 130, 246, 0.7)' },
-                            { label: 'Receita Simulada (Mix)', data: simulatedRevenue, backgroundColor: 'rgba(34, 197, 94, 0.7)' },
-                            { label: 'Ponto de Equilíbrio (PE)', data: breakEvenPoints, borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 2, type: 'line', spanGaps: true, pointRadius: 0 }
-                        ]
-                    },
-                    options: { ...chartDefaultOptions, plugins: { ...chartDefaultOptions.plugins, tooltip: { callbacks: { label: (context) => context.parsed.y !== null ? `R$ ${context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : 'N/A' } } }, scales: { ...chartDefaultOptions.scales, y: { ...chartDefaultOptions.scales.y, ticks: { ...chartDefaultOptions.scales.y.ticks, callback: (value) => `R$ ${(value / 1000).toLocaleString('pt-BR')}k` } } } }
-                });
-
-                // Margin Chart
-                const marginCtx = document.getElementById('marginSimulatorChart').getContext('2d');
-                createChart(marginCtx, {
-                    type: 'bar',
-                    data: {
-                        labels,
-                        datasets: [
-                            { label: 'MC Realizada (DRE)', data: contributionMargin, backgroundColor: 'rgba(139, 92, 246, 0.7)' },
-                            { label: 'MC Simulada (Mix)', data: simulatedMargin, backgroundColor: 'rgba(245, 158, 11, 0.7)' }
-                        ]
-                    },
-                    options: { ...chartDefaultOptions, plugins: { ...chartDefaultOptions.plugins, tooltip: { callbacks: { label: (context) => context.parsed.y !== null ? `R$ ${context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : 'N/A' } } }, scales: { ...chartDefaultOptions.scales, y: { ...chartDefaultOptions.scales.y, beginAtZero: false, ticks: { ...chartDefaultOptions.scales.y.ticks, callback: (value) => `R$ ${(value / 1000).toLocaleString('pt-BR')}k` } } } }
-                });
-            };
-
-            const renderOperationalNetMarginChart = (data) => {
-                const { labels, datasets } = data;
-                const netRevenue = datasets.netRevenue || [];
-                const operationalResult = datasets.operationalResult || [];
-                const netProfit = datasets.netProfit || [];
-
-                const operationalMargin = netRevenue.map((rev, i) => rev > 0 ? (operationalResult[i] / rev) * 100 : null);
-                const netMargin = netRevenue.map((rev, i) => rev > 0 ? (netProfit[i] / rev) * 100 : null);
-
-                const ctx = document.getElementById('operationalNetMarginChart').getContext('2d');
-                createChart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels,
-                        datasets: [
-                            { label: 'Margem Operacional (%)', data: operationalMargin, borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.1, spanGaps: true },
-                            { label: 'Margem Líquida (%)', data: netMargin, borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.1, spanGaps: true }
-                        ]
-                    },
-                    options: {
-                        ...chartDefaultOptions,
-                        scales: { ...chartDefaultOptions.scales, y: { ...chartDefaultOptions.scales.y, beginAtZero: false, ticks: { ...chartDefaultOptions.scales.y.ticks, callback: (value) => `${value.toFixed(0)}%` } } },
-                        plugins: { ...chartDefaultOptions.plugins, tooltip: { callbacks: { label: (context) => context.parsed.y !== null ? `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%` : 'N/A' } } }
-                    }
-                });
-            };
-
-            const renderResultQualityChart = (data) => {
-                const { labels, datasets } = data;
-                const operationalResult = datasets.operationalResult || [];
-                const nonOperationalResult = datasets.nonOperationalResult || [];
-
-                const ctx = document.getElementById('resultQualityChart').getContext('2d');
-                createChart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels,
-                        datasets: [
-                            { label: 'Resultado Operacional', data: operationalResult, backgroundColor: 'rgba(59, 130, 246, 0.7)' },
-                            { label: 'Resultado Não Operacional', data: nonOperationalResult, backgroundColor: 'rgba(234, 179, 8, 0.7)' }
-                        ]
-                    },
-                    options: {
-                        ...chartDefaultOptions,
-                        scales: { ...chartDefaultOptions.scales, x: { ...chartDefaultOptions.scales.x, stacked: true }, y: { ...chartDefaultOptions.scales.y, stacked: true, ticks: { ...chartDefaultOptions.scales.y.ticks, callback: (value) => `R$ ${(value / 1000).toLocaleString('pt-BR')}k` } } },
-                        plugins: { ...chartDefaultOptions.plugins, tooltip: { callbacks: { label: (context) => context.parsed.y !== null ? `${context.dataset.label}: ${context.parsed.y.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}` : 'N/A' } } }
-                    }
-                });
-            };
-            
-            const renderFixedCostsCompositionChart = (datasets) => {
-                const sum = (arr) => arr ? arr.reduce((a, b) => (a || 0) + (b || 0), 0) : 0;
-                
-                const personnelCosts = sum(datasets.personnelCosts);
-                const occupationCosts = sum(datasets.occupationCosts);
-                const servicesCosts = sum(datasets.servicesCosts);
-
-                const ctx = document.getElementById('fixedCostsCompositionChart').getContext('2d');
-                createChart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Pessoal', 'Ocupação', 'Serviços de Terceiros'],
-                        datasets: [{
-                            data: [personnelCosts, occupationCosts, servicesCosts],
-                            backgroundColor: ['#3b82f6', '#8b5cf6', '#ec4899'],
-                            borderColor: '#1f2937',
-                            borderWidth: 2
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top', labels: { color: '#d1d5db' } },
-                            datalabels: { display: false }
-                        }
-                    }
-                });
-            };
-
-
-            const renderVerticalAnalysisChart = (data) => {
-                const { labels, datasets } = data;
-                const netRevenue = datasets.netRevenue || [];
-                const variableCosts = datasets.variableCosts || [];
-                const fixedCosts = datasets.fixedCosts || [];
-                const netProfit = datasets.netProfit || [];
-
-                const variableCostsPerc = netRevenue.map((rev, i) => rev > 0 ? (variableCosts[i] / rev) * 100 : null);
-                const fixedCostsPerc = netRevenue.map((rev, i) => rev > 0 ? (fixedCosts[i] / rev) * 100 : null);
-                const netProfitPerc = netRevenue.map((rev, i) => rev > 0 ? (netProfit[i] / rev) * 100 : null);
-
-                const ctx = document.getElementById('verticalAnalysisChart').getContext('2d');
-                createChart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels,
-                        datasets: [
-                            { label: 'Custos Variáveis (%)', data: variableCostsPerc, backgroundColor: 'rgba(239, 68, 68, 0.7)' },
-                            { label: 'Custos Fixos (%)', data: fixedCostsPerc, backgroundColor: 'rgba(249, 115, 22, 0.7)' },
-                            { label: 'Lucro Líquido (%)', data: netProfitPerc, backgroundColor: 'rgba(34, 197, 94, 0.7)' }
-                        ]
-                    },
-                    options: {
-                        ...chartDefaultOptions,
-                        scales: { ...chartDefaultOptions.scales, x: { ...chartDefaultOptions.scales.x, stacked: true }, y: { ...chartDefaultOptions.scales.y, stacked: true, ticks: { ...chartDefaultOptions.scales.y.ticks, callback: (value) => `${value.toFixed(0)}%` } } },
-                        plugins: { ...chartDefaultOptions.plugins, tooltip: { callbacks: { label: (context) => context.parsed.y !== null ? `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%` : 'N/A' } } }
-                    }
-                });
-            };
-
-            const renderHorizontalAnalysisChart = (data) => {
-                const { labels, datasets } = data;
-                const netRevenue = datasets.netRevenue || [];
-                const netProfit = datasets.netProfit || [];
-
-                const revenueChange = [null];
-                for (let i = 1; i < netRevenue.length; i++) {
-                    const change = (netRevenue[i-1] !== null && netRevenue[i-1] !== 0) ? ((netRevenue[i] - netRevenue[i-1]) / netRevenue[i-1]) * 100 : null;
-                    revenueChange.push(change);
-                }
-
-                const profitChange = [null];
-                for (let i = 1; i < netProfit.length; i++) {
-                    const change = (netProfit[i-1] !== null && netProfit[i-1] !== 0) ? ((netProfit[i] - netProfit[i-1]) / Math.abs(netProfit[i-1])) * 100 : null;
-                    profitChange.push(change);
-                }
-                
-                const ctx = document.getElementById('horizontalAnalysisChart').getContext('2d');
-                createChart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels,
-                        datasets: [
-                            { label: 'Variação Receita Líquida (%)', data: revenueChange, borderColor: '#3b82f6', backgroundColor: 'transparent', tension: 0.1, spanGaps: true },
-                            { label: 'Variação Lucro Líquido (%)', data: profitChange, borderColor: '#22c55e', backgroundColor: 'transparent', tension: 0.1, spanGaps: true }
-                        ]
-                    },
-                    options: {
-                        ...chartDefaultOptions,
-                        scales: { ...chartDefaultOptions.scales, y: { ...chartDefaultOptions.scales.y, beginAtZero: false, ticks: { ...chartDefaultOptions.scales.y.ticks, callback: (value) => `${value.toFixed(0)}%` } } },
-                        plugins: { ...chartDefaultOptions.plugins, tooltip: { callbacks: { label: (context) => context.parsed.y !== null ? `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%` : 'N/A' } } }
-                    }
-                });
-            };
-            
-            const renderCostsCompositionChart = (datasets) => {
-                const ctx = document.getElementById('costsCompositionChart').getContext('2d');
-                const sum = (arr) => arr ? arr.reduce((a, b) => (a || 0) + (b || 0), 0) : 0;
-                const totalRawMaterial = sum(datasets.rawMaterial);
-                const totalVariable = sum(datasets.variableCosts);
-                const otherVariable = totalVariable > totalRawMaterial ? totalVariable - totalRawMaterial : 0;
-
-                createChart(ctx, { 
-                    type: 'doughnut', 
-                    data: { 
-                        labels: ['Matéria Prima', 'Outros Custos Variáveis'], 
-                        datasets: [{ 
-                            data: [totalRawMaterial, otherVariable], 
-                            backgroundColor: ['#ef4444', '#eab308'], 
-                            borderColor: '#1f2937', 
-                            borderWidth: 2 
-                        }] 
-                    }, 
-                    options: { 
-                        responsive: true, 
-                        maintainAspectRatio: false, 
-                        plugins: { 
-                            legend: { position: 'top', labels: { color: '#d1d5db' } },
-                            datalabels: { display: false }
-                        } 
-                    } 
-                });
-            };
-            
-            const renderPricingResultsTable = (results, labels, dreData) => {
-                const resultsBody = document.getElementById('results-body');
-                resultsBody.innerHTML = '';
-                const formatCurrency = (value) => value !== null && !isNaN(value) ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A';
-                const formatKg = (value) => value !== null && !isNaN(value) ? `${value.toFixed(2)} kg` : 'N/A';
-                
-                results.forEach((result, i) => {
-                    const row = document.createElement('tr');
-                    if (result && result.pe_rs !== null) {
-                        const revenueReal = dreData.datasets.netRevenue[i];
-                        const revenueSimulado = result.receitaMixTotal;
-                        const difference = revenueSimulado - revenueReal;
-                        const diffColor = difference >= 0 ? 'text-green-400' : 'text-red-400';
-
-                        row.innerHTML = `
-                            <td class="p-4 font-semibold">${labels[i]}</td>
-                            <td class="p-4 text-right">${formatCurrency(revenueReal)}</td>
-                            <td class="p-4 text-right">${formatCurrency(revenueSimulado)}</td>
-                            <td class="p-4 text-right font-semibold ${diffColor}">${formatCurrency(difference)}</td>
-                            <td class="p-4 text-right">${formatCurrency(result.pe_rs)}</td>
-                            <td class="p-4 text-right">${formatKg(result.pe_kg)}</td>
-                        `;
-                    } else {
-                        row.innerHTML = `<td class="p-4 font-semibold">${labels[i]}</td><td class="p-4 text-center text-gray-500" colspan="5">Dados insuficientes para cálculo</td>`;
-                    }
-                    resultsBody.appendChild(row);
-                });
-            };
-
-            const renderBreakEvenProjection = (data) => {
-                const { labels, datasets } = data;
-                const netRevenue = datasets.netRevenue;
-                const contributionMargin = datasets.contributionMargin;
-                const fixedCosts = datasets.fixedCosts;
-
-                const breakEvenPoints = netRevenue.map((rev, i) => {
-                    const mcPercent = rev > 0 ? contributionMargin[i] / rev : 0;
-                    return mcPercent > 0 ? fixedCosts[i] / mcPercent : null;
-                });
-
-                const validFixedCosts = fixedCosts.filter(fc => fc !== null);
-                const validMcPercents = netRevenue.map((rev, i) => rev > 0 ? contributionMargin[i] / rev : null).filter(mc => mc !== null && mc > 0);
-                
-                const avgFixedCosts = validFixedCosts.reduce((a, b) => a + b, 0) / validFixedCosts.length;
-                const avgMcPercent = validMcPercents.reduce((a, b) => a + b, 0) / validMcPercents.length;
-                const projectedPE = avgMcPercent > 0 ? avgFixedCosts / avgMcPercent : 0;
-
-                const lastMonthIndex = fullExtractedData.labels.indexOf(labels[labels.length - 1]);
-                const projectionLabels = [];
-                for (let i = 1; i <= 6; i++) {
-                    projectionLabels.push(fullExtractedData.labels[(lastMonthIndex + i) % 12].substring(0, 3));
-                }
-
-                const allLabels = [...labels, ...projectionLabels];
-                const projectedPEData = new Array(labels.length).fill(null).concat(new Array(6).fill(projectedPE));
-
-                const ctx = document.getElementById('breakEvenProjectionChart').getContext('2d');
-                createChart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: allLabels,
-                        datasets: [
-                            { label: 'Receita Real (DRE)', data: netRevenue, backgroundColor: 'rgba(59, 130, 246, 0.7)' },
-                            { label: 'Ponto de Equilíbrio (DRE)', data: breakEvenPoints, borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 2, type: 'line', spanGaps: true, pointRadius: 3 },
-                            { label: 'Meta de PE Projetada', data: projectedPEData, borderColor: '#f59e0b', backgroundColor: 'transparent', borderWidth: 2, borderDash: [5, 5], type: 'line', spanGaps: true, pointRadius: 3 }
-                        ]
-                    },
-                    options: { ...chartDefaultOptions, plugins: { ...chartDefaultOptions.plugins, tooltip: { callbacks: { label: (context) => context.parsed.y !== null ? `R$ ${context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : 'N/A' } } }, scales: { ...chartDefaultOptions.scales, y: { ...chartDefaultOptions.scales.y, ticks: { ...chartDefaultOptions.scales.y.ticks, callback: (value) => `R$ ${(value / 1000).toLocaleString('pt-BR')}k` } } } }
-                });
-
-                const tableBody = document.getElementById('breakEvenProjectionTable');
-                tableBody.innerHTML = '';
-                const formatCurrency = (value) => value !== null && !isNaN(value) ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A';
-                const formatPerc = (value) => value !== null && !isNaN(value) ? `${(value * 100).toFixed(2)}%` : 'N/A';
-
-                labels.forEach((label, i) => {
-                    const mcPercent = netRevenue[i] > 0 ? contributionMargin[i] / netRevenue[i] : null;
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="p-3 font-semibold">${label}</td>
-                        <td class="p-3 text-right">${formatCurrency(contributionMargin[i])}</td>
-                        <td class="p-3 text-right">${formatPerc(mcPercent)}</td>
-                        <td class="p-3 text-right">${formatCurrency(breakEvenPoints[i])}</td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-            };
-
-            const addMaterialRow = (name = '', percentage = '', sellPrice = '') => {
-                const row = document.createElement('tr');
-                row.className = "material-row";
-                row.innerHTML = `
-                    <td class="p-2"><input type="text" value="${name}" class="material-name w-full bg-gray-700 border border-gray-600 rounded p-1" placeholder="Nome do Material"></td>
-                    <td class="p-2"><input type="number" value="${percentage}" class="material-percentage w-full bg-gray-700 border border-gray-600 rounded p-1" placeholder="%" required></td>
-                    <td class="p-2"><input type="text" value="${sellPrice}" class="material-sell-price w-full bg-gray-700 border border-gray-600 rounded p-1" placeholder="R$/KG" required></td>
-                    <td class="p-2 text-center"><button class="remove-material-btn text-red-500 font-bold text-xl">&times;</button></td>
-                `;
-                row.querySelector('.remove-material-btn').addEventListener('click', () => {
-                    row.remove();
-                    updateMixWarning();
-                });
-                 row.querySelectorAll('input').forEach(input => input.addEventListener('input', updateMixWarning));
-                materialsBody.appendChild(row);
-                updateMixWarning();
-            };
-
-            const populateDefaultMaterials = () => {
-                materialsBody.innerHTML = '';
-                const defaultMaterials = [
-                    { name: 'LINGOTE', percentage: 68.00, sellPrice: '22.00' },
-                    { name: 'METAL', percentage: 4.00, sellPrice: '32.00' },
-                    { name: 'FERRO', percentage: 10.00, sellPrice: '1.10' },
-                    { name: 'TERRA', percentage: 10.00, sellPrice: '3.00' },
-                    { name: 'CHUMBO', percentage: 0.00, sellPrice: '0.00' },
-                    { name: 'ALUM/BLOCO', percentage: 5.00, sellPrice: '7.10' },
-                    { name: 'GG', percentage: 3.00, sellPrice: '13.50' },
-                    { name: 'PERDA', percentage: 0.00, sellPrice: '0.00' },
-                ];
-                defaultMaterials.forEach(material => {
-                    addMaterialRow(material.name, material.percentage, material.sellPrice);
-                });
-            };
-            
-            const populateMonthFilter = (labels) => {
-                monthFilterContainer.innerHTML = '';
-                labels.forEach((label, index) => {
-                    const monthId = `month-${index}`;
-                    const div = document.createElement('div');
-                    div.innerHTML = `
-                        <input type="checkbox" id="${monthId}" value="${label}" class="hidden month-checkbox" checked>
-                        <label for="${monthId}" class="cursor-pointer w-full text-center text-sm p-2 block border border-gray-600 rounded-lg bg-gray-700 text-gray-300 transition-colors duration-200">${label.substring(0,3)}</label>
-                    `;
-                    monthFilterContainer.appendChild(div);
-                });
-                monthFilterSection.classList.remove('hidden');
-            };
-            
-            const updateMixWarning = () => {
-                const materialRows = materialsBody.querySelectorAll('tr');
-                let totalPercentage = 0;
-                materialRows.forEach(row => {
-                    totalPercentage += parseFloat(row.querySelector('.material-percentage').value) || 0;
-                });
-                
-                if (Math.abs(totalPercentage - 100) > 0.01 && totalPercentage > 0) {
-                    mixWarningDiv.textContent = `A soma das porcentagens é ${totalPercentage.toFixed(2)}%, diferente de 100%. As estimativas podem estar distorcidas.`;
-                    mixWarningDiv.classList.remove('hidden');
-                } else {
-                    mixWarningDiv.classList.add('hidden');
-                }
-            };
-            
-            normalizeBtn.addEventListener('click', () => {
-                const materialRows = materialsBody.querySelectorAll('tr');
-                let totalPercentage = 0;
-                materialRows.forEach(row => {
-                    totalPercentage += parseFloat(row.querySelector('.material-percentage').value) || 0;
-                });
-
-                if (totalPercentage > 0) {
-                    materialRows.forEach(row => {
-                        const input = row.querySelector('.material-percentage');
-                        const currentValue = parseFloat(input.value) || 0;
-                        input.value = ((currentValue / totalPercentage) * 100).toFixed(2);
-                    });
-                }
-                updateMixWarning();
-            });
-
-            formatPricesBtn.addEventListener('click', () => {
-                const materialRows = materialsBody.querySelectorAll('tr');
-                materialRows.forEach(row => {
-                    const priceInput = row.querySelector('.material-sell-price');
-                    let value = priceInput.value;
-
-                    if (value.trim() === '') {
-                        return; 
-                    }
-                    
-                    const cleanedValue = value.replace(/R\$\s*/g, '').trim().replace(',', '.');
-                    const numericValue = parseFloat(cleanedValue);
-
-                    if (!isNaN(numericValue)) {
-                        priceInput.value = numericValue.toFixed(2);
-                    }
-                });
-            });
-            
-            fixedCostModeSelect.addEventListener('change', () => {
-                fixedCostManualInput.classList.toggle('hidden', fixedCostModeSelect.value === 'dre');
-                if(fixedCostModeSelect.value === 'manual') {
-                    fixedCostManualInput.required = true;
-                } else {
-                    fixedCostManualInput.required = false;
-                }
-            });
-
-            fileInput.addEventListener('change', async () => {
-                const file = fileInput.files[0];
-                if (!file) return;
-
-                loader.classList.remove('hidden');
-                loaderText.textContent = 'Lendo PDF e extraindo meses...';
-                errorMessageDiv.classList.add('hidden');
-                resultsContainer.classList.add('hidden');
-                monthFilterSection.classList.add('hidden');
-                analyzeButton.disabled = true;
-
-                const fileReader = new FileReader();
-                fileReader.onload = async function() {
+                for (let i = 0; i < 3; i++) {
                     try {
-                        const typedarray = new Uint8Array(this.result);
-                        fullPdfText = await extractPdfText(typedarray);
-                        const apiKey = apiKeyInput.value;
-                        if (!apiKey) {
-                            showError('Por favor, insira a sua chave da API do Gemini antes de carregar o PDF.');
-                            return;
-                        }
-                        fullExtractedData = await getStructuredDataFromAI(fullPdfText, apiKey);
+                        const response = await fetch(apiUrl, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) 
+                        });
                         
-                        if (!fullExtractedData.labels || fullExtractedData.labels.length === 0) {
-                            throw new Error("A IA não conseguiu extrair os meses do PDF.");
+                        if (!response.ok) { 
+                            if (response.status === 429) {
+                                console.warn(`Quota exceeded, retrying in ${ (i + 1) * 2000 }ms...`);
+                                await new Promise(res => setTimeout(res, (i + 1) * 2000));
+                                continue;
+                            }
+                            const err = await response.json(); 
+                            throw new Error(`HTTP error ${response.status}: ${err.error?.message || 'Unknown error'}`); 
                         }
-
-                        populateMonthFilter(fullExtractedData.labels);
-                        analyzeButton.disabled = false;
-                        loader.classList.add('hidden');
+                        
+                        const data = await response.json();
+                        
+                        if (data.candidates && data.candidates.length > 0 && data.candidates[0].content?.parts?.length > 0) {
+                             return data.candidates[0].content.parts[0].text;
+                        }
+                        return "Não foi possível gerar a análise. Resposta da API inválida.";
                     } catch (e) {
-                        showError(e.message);
+                        console.error(`Error in Gemini API call (attempt ${i+1}):`, e);
+                        if (i === 2) {
+                           return `Erro ao contatar a IA: ${e.message}`;
+                        }
                     }
-                };
-                fileReader.readAsArrayBuffer(file);
-            });
+                }
+            }
 
-            analyzeButton.addEventListener('click', handleAnalysis);
-            addMaterialBtn.addEventListener('click', () => addMaterialRow('Novo Material', '', ''));
-            
-            // Iniciar com alguns materiais
-            populateDefaultMaterials();
+            async function generateInsight(elementId, prompt) {
+                const container = document.getElementById(elementId);
+                if (!container) return;
+                
+                container.innerHTML = `
+                    <button class="insight-toggle">
+                        <span class="text-indigo-400 font-semibold">Ver Análise de IA</span>
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                    <div class="insight-content">
+                        <div class="p-4 flex justify-center items-center"><div class="loader-small"></div></div>
+                    </div>
+                `;
+
+                const response = await callGeminiApi(prompt);
+                const contentDiv = container.querySelector('.insight-content');
+                if (contentDiv) {
+                    const formattedResponse = response
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .split('\n')
+                        .filter(p => p.trim() !== '')
+                        .map(p => `<p>${p.replace(/\*/g, '')}</p>`)
+                        .join('');
+                    contentDiv.innerHTML = formattedResponse;
+                }
+            }
+
+            async function generateAllInsights() {
+                const insightPrompts = {
+                    'insight-paretoLucro': `Baseado nos lucros líquidos da Duralta ([${simulationData.duralta.lucroLiquido.join(', ')}]), qual foi o período mais decisivo e por quê? Seja conciso.`,
+                    'insight-radar': `Compare a Duralta (Market Share: 28.34, Margem: 13.84) com a Luminous SA (Market Share: 22.46, Margem: 16.3) e a Empresa 5 (Market Share: 22.24, Preço Médio: 466). Quais os pontos fortes e fracos da Duralta? Responda em 2 frases.`,
+                    'insight-heatmapVendas': `Analisando as vendas da Duralta (P2 a P4), quais regiões mostram crescimento consistente e quais estão em declínio ou voláteis?`,
+                    'insight-heatmapMarketShare': `Nosso market share cresceu nas regiões 1, 2 e 3, mas caiu na 6 no P4, mesmo com vendas maiores. O que isso indica sobre a concorrência na Região 6?`,
+                    'insight-regionalSales': `No P4, a Duralta dominou a Região 1 mas teve dificuldades nas regiões 5 e 6 contra a Luminous SA e a Empresa 5. Qual pode ser a causa da baixa performance na Região 5, considerando nosso preço competitivo?`,
+                    'insight-precoVendas': `No P4, a Região 1 (preço $520) vendeu mais que a Região 4 (preço $500). O que isso sugere sobre a sensibilidade ao preço em diferentes mercados?`,
+                    'insight-receitaRegiao': `Analisando a composição da receita da Duralta por região, qual foi o impacto da estratégia de preço do P4 no faturamento da Região 1 em comparação com as outras?`,
+                    'insight-demanda': `A Duralta teve vendas perdidas em P2 e P3, mas não em P4. Qual decisão operacional foi crucial para atender toda a demanda em P4?`,
+                    'insight-productionCapacity': `No P4, a Duralta usou 25% de produção extra, operando no limite da capacidade. Qual é a recomendação óbvia para o P5, que terá aumento de demanda?`,
+                    'insight-materiaPrima': `O que o pico de compras emergenciais em P4, ausente em P3, revela sobre o nosso planejamento de estoque e seus custos?`,
+                    'insight-custosEmergenciais': `Qual a relação direta entre a decisão de usar 25% de produção extra em P4 e o aumento expressivo nos custos de manutenção e compras emergenciais?`,
+                    'insight-lucroAlavancagem': `Como a decisão de tomar um grande empréstimo em P4, combinada com o aumento de preço, impactou o lucro operacional da Duralta? Foi uma boa estratégia?`,
+                    'insight-financeRadar': `Observando o Radar Financeiro, qual é o principal ponto de atenção para a Duralta em comparação com a Luminous SA, e qual o nosso ponto forte?`,
+                    'insight-motivacaoFatores': `A motivação dos funcionários estagnou em 'Regular' no P4, apesar do PLR. Qual outro fator, visível no gráfico, provavelmente impactou negativamente a motivação da equipe?`,
+                    'insight-motivacaoPlr': `O investimento em PLR aumentou em P4, mas a motivação continuou 'Regular'. O que isso sugere sobre a eficácia do PLR como único fator de motivação em um cenário de alta carga de trabalho?`,
+                    'insight-marcaPropaganda': `Atingimos "Marca Forte" em P4 com o menor investimento em propaganda da série. O que isso indica sobre a maturidade da nossa marca e qual decisão estratégica isso permite para o P5?`
+                };
+
+                const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+                for (const [id, prompt] of Object.entries(insightPrompts)) {
+                    generateInsight(id, prompt);
+                    await delay(1500); 
+                }
+            }
+
+            initializeDashboard();
         });
     </script>
 </body>
 </html>
+
